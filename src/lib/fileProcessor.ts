@@ -1,0 +1,37 @@
+import mammoth from 'mammoth';
+import * as pdfParseModule from 'pdf-parse';
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+
+export async function extractTextFromFile(
+  buffer: Buffer,
+  mimeType: string,
+  filename: string
+): Promise<{ text: string; isScanned: boolean }> {
+  const ext = filename.toLowerCase().split('.').pop();
+
+  if (ext === 'docx' || ext === 'doc' || mimeType.includes('word')) {
+    const result = await mammoth.extractRawText({ buffer });
+    return { text: result.value, isScanned: false };
+  }
+
+  if (ext === 'pdf' || mimeType.includes('pdf')) {
+    return extractFromPdf(buffer);
+  }
+
+  throw new Error('不支持的文件格式');
+}
+
+async function extractFromPdf(buffer: Buffer): Promise<{ text: string; isScanned: boolean }> {
+  try {
+    const parsed = await pdfParse(buffer);
+    const text = parsed.text?.trim() || '';
+
+    if (text.length > 50) {
+      return { text, isScanned: false };
+    }
+
+    return { text: '', isScanned: true };
+  } catch {
+    return { text: '', isScanned: true };
+  }
+}
