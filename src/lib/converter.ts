@@ -70,7 +70,7 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
 }
 
 export async function convertPdfToWord(buffer: Buffer): Promise<Buffer> {
-  // 绕过 pdf-parse index.js 的 debug 代码
+  // @ts-ignore: bypass pdf-parse index.js debug code
   const pdfParseModule: any = await import('pdf-parse/lib/pdf-parse.js');
   const pdfParse = pdfParseModule.default || pdfParseModule;
   const parsed = await pdfParse(buffer);
