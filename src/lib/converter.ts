@@ -1,5 +1,6 @@
 import mammoth from 'mammoth';
 import { PDFDocument, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { Document, Paragraph, TextRun, Packer } from 'docx';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,6 +18,9 @@ function getCjkFontBytes(): Uint8Array {
 export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
   const { value: text } = await mammoth.extractRawText({ buffer });
   const pdfDoc = await PDFDocument.create();
+  
+  // 注册 fontkit 以支持自定义字体嵌入
+  pdfDoc.registerFontkit(fontkit);
   
   // 嵌入中文字体，替代不支持中文的 Helvetica
   const fontBytes = getCjkFontBytes();
