@@ -20,11 +20,11 @@ export async function POST(req: NextRequest) {
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
-    const allowedExts = ['.pdf', '.doc', '.docx'];
+    const allowedExts = ['.pdf', '.docx'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
 
     if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
-      return NextResponse.json({ error: '仅支持 Word 和 PDF 文件' }, { status: 400 });
+      return NextResponse.json({ error: '仅支持 Word (.docx) 和 PDF 文件' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();

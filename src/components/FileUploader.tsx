@@ -17,10 +17,10 @@ export default function FileUploader({ onUpload }: FileUploaderProps) {
     if (!files || files.length === 0) return;
     const file = files[0];
 
-    const allowedExts = ['.pdf', '.doc', '.docx'];
+    const allowedExts = ['.pdf', '.docx'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowedExts.includes(ext)) {
-      setError('仅支持 Word (.doc/.docx) 和 PDF 文件');
+      setError('仅支持 Word (.docx) 和 PDF 文件');
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
@@ -109,7 +109,7 @@ export default function FileUploader({ onUpload }: FileUploaderProps) {
         <input
           type="file"
           className="hidden"
-          accept=".pdf,.doc,.docx"
+          accept=".pdf,.docx"
           onChange={(e) => handleFiles(e.target.files)}
         />
       </label>
