@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('Upload error:', err);
-    return NextResponse.json({ error: err.message || '上传失败' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || '上传失败', stack: err.stack, name: err.name },
+      { status: 500 }
+    );
   }
 }
