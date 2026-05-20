@@ -1,11 +1,27 @@
 import mammoth from 'mammoth';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import { Document, Paragraph, TextRun, Packer } from 'docx';
+import * as fs from 'fs';
+import * as path from 'path';
+
+let cjkFontCache: Uint8Array | null = null;
+
+function getCjkFontBytes(): Uint8Array {
+  if (!cjkFontCache) {
+    const fontPath = path.join(process.cwd(), 'public', 'NotoSansSC-Regular.otf');
+    cjkFontCache = fs.readFileSync(fontPath);
+  }
+  return cjkFontCache;
+}
 
 export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
   const { value: text } = await mammoth.extractRawText({ buffer });
   const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  
+  // 嵌入中文字体，替代不支持中文的 Helvetica
+  const fontBytes = getCjkFontBytes();
+  const font = await pdfDoc.embedFont(fontBytes);
+  
   const fontSize = 12;
   const lineHeight = fontSize * 1.5;
   const margin = 50;
@@ -54,8 +70,9 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
 }
 
 export async function convertPdfToWord(buffer: Buffer): Promise<Buffer> {
-  const pdfParseMod = await import('pdf-parse');
-  const pdfParse = (pdfParseMod as any).default || pdfParseMod;
+  // 绕过 pdf-parse index.js 的 debug 代码
+  const pdfParseModule: any = await import('pdf-parse/lib/pdf-parse.js');
+  const pdfParse = pdfParseModule.default || pdfParseModule;
   const parsed = await pdfParse(buffer);
   const text = parsed.text || '';
 
