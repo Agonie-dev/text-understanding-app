@@ -4,11 +4,23 @@ import { Document, Paragraph, TextRun, Packer } from 'docx';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// pdfkit 在 serverless 环境中找不到内置字体数据文件，需要手动指定路径
+const PDFKIT_DATA_DIR = path.join(process.cwd(), 'public', 'pdfkit-data');
+
 function getFontPath(): string {
   return path.join(process.cwd(), 'public', 'unifont.otf');
 }
 
+function setupPdfkitEnv() {
+  // 优先使用项目内复制的字体数据文件（serverless 环境）
+  if (fs.existsSync(PDFKIT_DATA_DIR)) {
+    process.env.PDFKIT_DATA = PDFKIT_DATA_DIR;
+  }
+}
+
 export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
+  setupPdfkitEnv();
+  
   const { value: text } = await mammoth.extractRawText({ buffer });
   
   return new Promise((resolve, reject) => {
