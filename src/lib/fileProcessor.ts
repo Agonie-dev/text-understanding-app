@@ -21,6 +21,7 @@ export async function extractTextFromFile(
 
 async function extractFromPdf(buffer: Buffer): Promise<{ text: string; isScanned: boolean }> {
   try {
+    // @ts-ignore: pdf-parse index.js has debug code that crashes in serverless
     const pdfParseModule: any = await import('pdf-parse/lib/pdf-parse.js');
     const pdfParse = pdfParseModule.default || pdfParseModule;
     const parsed = await pdfParse(buffer);
