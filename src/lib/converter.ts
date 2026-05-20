@@ -9,7 +9,7 @@ let cjkFontCache: Uint8Array | null = null;
 
 function getCjkFontBytes(): Uint8Array {
   if (!cjkFontCache) {
-    const fontPath = path.join(process.cwd(), 'public', 'NotoSansSC-Regular.otf');
+    const fontPath = path.join(process.cwd(), 'public', 'unifont.otf');
     cjkFontCache = fs.readFileSync(fontPath);
   }
   return cjkFontCache;
@@ -22,9 +22,9 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
   // 注册 fontkit 以支持自定义字体嵌入
   pdfDoc.registerFontkit(fontkit);
   
-  // 嵌入中文字体，替代不支持中文的 Helvetica
+  // 嵌入中文字体（unifont 位图字体，5MB，支持所有 Unicode）
   const fontBytes = getCjkFontBytes();
-  const font = await pdfDoc.embedFont(fontBytes);
+  const font = await pdfDoc.embedFont(fontBytes, { subset: true });
   
   const fontSize = 12;
   const lineHeight = fontSize * 1.5;
