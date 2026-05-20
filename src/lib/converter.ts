@@ -1,76 +1,56 @@
 import mammoth from 'mammoth';
-import { PDFDocument, rgb } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+import PDFDocument from 'pdfkit';
 import { Document, Paragraph, TextRun, Packer } from 'docx';
 import * as fs from 'fs';
 import * as path from 'path';
 
-let cjkFontCache: Uint8Array | null = null;
-
-function getCjkFontBytes(): Uint8Array {
-  if (!cjkFontCache) {
-    const fontPath = path.join(process.cwd(), 'public', 'unifont.otf');
-    cjkFontCache = fs.readFileSync(fontPath);
-  }
-  return cjkFontCache;
+function getFontPath(): string {
+  return path.join(process.cwd(), 'public', 'unifont.otf');
 }
 
 export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
   const { value: text } = await mammoth.extractRawText({ buffer });
-  const pdfDoc = await PDFDocument.create();
   
-  // 注册 fontkit 以支持自定义字体嵌入
-  pdfDoc.registerFontkit(fontkit);
-  
-  // 嵌入中文字体（unifont 位图字体，5MB，支持所有 Unicode）
-  const fontBytes = getCjkFontBytes();
-  const font = await pdfDoc.embedFont(fontBytes, { subset: true });
-  
-  const fontSize = 12;
-  const lineHeight = fontSize * 1.5;
-  const margin = 50;
-  const pageWidth = 612;
-  const pageHeight = 792;
-  const maxWidth = pageWidth - margin * 2;
-
-  let page = pdfDoc.addPage([pageWidth, pageHeight]);
-  let y = pageHeight - margin;
-
-  const lines = text.split('\n');
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      y -= lineHeight;
-      continue;
-    }
-
-    const words = line.split('');
-    let currentLine = '';
-
-    for (const word of words) {
-      const testLine = currentLine + word;
-      const width = font.widthOfTextAtSize(testLine, fontSize);
-      if (width > maxWidth && currentLine) {
-        page.drawText(currentLine, { x: margin, y, size: fontSize, font, color: rgb(0, 0, 0) });
-        y -= lineHeight;
-        currentLine = word;
-      } else {
-        currentLine = testLine;
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const doc = new PDFDocument();
+    
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    
+    // 注册中文字体
+    doc.registerFont('unifont', getFontPath());
+    doc.font('unifont').fontSize(12);
+    
+    const lines = text.split('\n');
+    let y = 72; // 1 inch margin
+    const lineHeight = 18;
+    const margin = 72;
+    const pageHeight = 792;
+    
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) {
+        y += lineHeight;
+        continue;
       }
+      
+      // 自动分页
+      if (y > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      
+      doc.text(line, margin, y, {
+        width: 612 - margin * 2,
+        align: 'left',
+      });
+      y += lineHeight;
     }
-
-    if (currentLine) {
-      page.drawText(currentLine, { x: margin, y, size: fontSize, font, color: rgb(0, 0, 0) });
-      y -= lineHeight;
-    }
-
-    if (y < margin + lineHeight) {
-      page = pdfDoc.addPage([pageWidth, pageHeight]);
-      y = pageHeight - margin;
-    }
-  }
-
-  return Buffer.from(await pdfDoc.save());
+    
+    doc.end();
+  });
 }
 
 export async function convertPdfToWord(buffer: Buffer): Promise<Buffer> {
