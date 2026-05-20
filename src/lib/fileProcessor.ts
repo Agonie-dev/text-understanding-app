@@ -1,5 +1,4 @@
 import mammoth from 'mammoth';
-import pdfParse from 'pdf-parse';
 
 export async function extractTextFromFile(
   buffer: Buffer,
@@ -22,6 +21,7 @@ export async function extractTextFromFile(
 
 async function extractFromPdf(buffer: Buffer): Promise<{ text: string; isScanned: boolean }> {
   try {
+    const pdfParse = (await import('pdf-parse')).default;
     const parsed = await pdfParse(buffer);
     const text = parsed.text?.trim() || '';
 
