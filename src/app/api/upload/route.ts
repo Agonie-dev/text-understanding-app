@@ -30,7 +30,9 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    console.log('Processing file:', file.name, 'size:', file.size, 'type:', file.type);
     const { text, isScanned } = await extractTextFromFile(buffer, file.type, file.name);
+    console.log('Extracted text length:', text.length);
 
     const { data, error } = await supabase
       .from('history')

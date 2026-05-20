@@ -30,7 +30,8 @@ async function extractFromPdf(buffer: Buffer): Promise<{ text: string; isScanned
     }
 
     return { text: '', isScanned: true };
-  } catch {
+  } catch (e: any) {
+    console.error('pdfParse error:', e.message);
     return { text: '', isScanned: true };
   }
 }
