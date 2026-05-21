@@ -140,6 +140,7 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
       } else if (item.type === 'image') {
         try {
           const imgBuffer = Buffer.from(item.value, 'base64');
+          // @ts-ignore: pdfkit 类型定义不完整，运行时存在 openImage 方法
           const img = doc.openImage(imgBuffer);
           
           // 限制图片宽度，等比缩放
