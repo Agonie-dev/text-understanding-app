@@ -25,7 +25,7 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
   
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ font: undefined });
     
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -51,6 +51,7 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
       // 自动分页
       if (y > pageHeight - margin) {
         doc.addPage();
+        doc.font('unifont').fontSize(12); // 新页面重新设置字体
         y = margin;
       }
       
