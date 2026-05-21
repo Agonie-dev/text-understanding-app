@@ -44,8 +44,8 @@ function parseHtmlToItems(html: string): ContentItem[] {
   
   if (!content) return items;
   
-  // 匹配所有内嵌 base64 图片
-  const imgRegex = /<img\s+[^>]*src="data:([^;]+);base64,([^"]+)"/gi;
+  // 匹配所有内嵌 base64 图片（匹配完整标签到 >）
+  const imgRegex = /<img\s+[^>]*src="data:([^;]+);base64,([^"]+)"[^>]*>/gi;
   let lastIndex = 0;
   let match;
   
@@ -80,6 +80,10 @@ function parseHtmlToItems(html: string): ContentItem[] {
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
       .replace(/<[^>]+>/g, '')
+      .replace(/\s*\/>/g, '')
+      .trim()
+      .replace(/\s*\/>/g, '')
+      .trim()
   );
   
   if (text.trim()) {
