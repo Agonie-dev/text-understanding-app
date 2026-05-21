@@ -25,7 +25,7 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
   
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    const doc = new PDFDocument({ font: undefined });
+    const doc = new PDFDocument({ font: '' });
     
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
