@@ -35,32 +35,15 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
     doc.registerFont('unifont', getFontPath());
     doc.font('unifont').fontSize(12);
     
-    const lines = text.split('\n');
-    let y = 72; // 1 inch margin
-    const lineHeight = 18;
     const margin = 72;
-    const pageHeight = 792;
     
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line) {
-        y += lineHeight;
-        continue;
-      }
-      
-      // 自动分页
-      if (y > pageHeight - margin) {
-        doc.addPage();
-        doc.font('unifont').fontSize(12); // 新页面重新设置字体
-        y = margin;
-      }
-      
-      doc.text(line, margin, y, {
-        width: 612 - margin * 2,
-        align: 'left',
-      });
-      y += lineHeight;
-    }
+    // 使用 PDFKit 流式布局自动处理换行和分页
+    // 避免手动维护 y 坐标与 PDFKit 内部 LineWrapper 不同步导致的重叠问题
+    doc.text(text, margin, margin, {
+      width: 612 - margin * 2,
+      align: 'left',
+      lineGap: 6,
+    });
     
     doc.end();
   });
