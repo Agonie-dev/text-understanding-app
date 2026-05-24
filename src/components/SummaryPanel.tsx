@@ -40,6 +40,7 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
   const [charCount, setCharCount] = useState(0);
   const [progressStage, setProgressStage] = useState('');
   const [selectedStyle, setSelectedStyle] = useState<SummaryStyle>('default');
+  const [useStream, setUseStream] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const pendingRef = useRef('');
@@ -99,6 +100,26 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
     abortRef.current = controller;
 
     try {
+      // ========== 非流式模式 ==========
+      if (!useStream) {
+        const res = await fetch('/api/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, filename, stream: false, style: selectedStyle }),
+          signal: controller.signal,
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '总结失败');
+
+        setDisplaySummary(data.summary || '');
+        setCharCount((data.summary || '').length);
+        setLoading(false);
+        abortRef.current = null;
+        return;
+      }
+
+      // ========== 流式模式 ==========
       const res = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -247,6 +268,20 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
         </div>
       </div>
 
+      {/* Stream toggle */}
+      <div className="mb-3 flex items-center gap-2">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={useStream}
+            onChange={(e) => !loading && setUseStream(e.target.checked)}
+            disabled={loading}
+            className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+          />
+          <span className="text-sm text-gray-600">启用流式输出（逐字显示，但可能因超时截断）</span>
+        </label>
+      </div>
+
       <div className="flex gap-2">
         <button
           onClick={handleSummarize}
@@ -262,7 +297,7 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
           {loading ? 'AI 正在生成...' : '生成 AI 智能总结'}
         </button>
 
-        {loading && (
+        {loading && useStream && (
           <button
             onClick={handleStop}
             className="py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-medium transition-colors border border-red-200 flex-shrink-0"
@@ -272,7 +307,7 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
         )}
       </div>
 
-      {loading && (
+      {loading && useStream && (
         <div className="mt-3 p-2 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700 flex items-center justify-between">
           <span className="flex items-center gap-2">
             <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -282,6 +317,18 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
             {progressStage || 'AI 正在生成...'}
           </span>
           <span className="text-xs text-blue-500 font-medium">已生成 {charCount.toLocaleString()} 字</span>
+        </div>
+      )}
+
+      {loading && !useStream && (
+        <div className="mt-3 p-2 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700">
+          <span className="flex items-center gap-2">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            AI 正在生成完整总结，请稍候...
+          </span>
         </div>
       )}
 
