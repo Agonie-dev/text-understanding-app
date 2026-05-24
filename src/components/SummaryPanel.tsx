@@ -2,6 +2,16 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
+export type SummaryStyle = 'default' | 'academic' | 'meeting' | 'news' | 'minimal';
+
+const STYLE_OPTIONS: { value: SummaryStyle; label: string; icon: string }[] = [
+  { value: 'default', label: '标准', icon: '📝' },
+  { value: 'academic', label: '学术', icon: '🎓' },
+  { value: 'meeting', label: '会议纪要', icon: '📊' },
+  { value: 'news', label: '新闻摘要', icon: '📰' },
+  { value: 'minimal', label: '极简', icon: '⚡' },
+];
+
 interface SummaryPanelProps {
   text: string;
   filename: string;
@@ -29,6 +39,7 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
   const [error, setError] = useState('');
   const [charCount, setCharCount] = useState(0);
   const [progressStage, setProgressStage] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState<SummaryStyle>('default');
 
   const abortRef = useRef<AbortController | null>(null);
   const pendingRef = useRef('');
@@ -79,7 +90,7 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
       const res = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, filename, stream: true }),
+        body: JSON.stringify({ text, filename, stream: true, style: selectedStyle }),
         signal: controller.signal,
       });
 
@@ -201,6 +212,28 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
           ⚠️ 文档较长（共 {meta.originalLength.toLocaleString()} 字），已提取前 {text.length.toLocaleString()} 字核心内容进行总结
         </div>
       )}
+
+      {/* Style selector */}
+      <div className="mb-3">
+        <p className="text-xs text-gray-500 mb-2">选择总结风格</p>
+        <div className="flex flex-wrap gap-2">
+          {STYLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => !loading && setSelectedStyle(opt.value)}
+              disabled={loading}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                selectedStyle === opt.value
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
+              } disabled:opacity-50`}
+            >
+              <span className="mr-1">{opt.icon}</span>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="flex gap-2">
         <button

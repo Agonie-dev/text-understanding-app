@@ -1,8 +1,11 @@
 const KIMI_API_KEY = process.env.KIMI_API_KEY!;
 const KIMI_BASE_URL = process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
 
-function buildPrompts(text: string, isPartial = false, isMerge = false) {
-  const systemPrompt = `你是一位专业的文档分析助手。请严格基于原文内容进行总结，不编造、不扩展任何信息。
+export type SummaryStyle = 'default' | 'academic' | 'meeting' | 'news' | 'minimal';
+
+const STYLE_PROMPTS: Record<SummaryStyle, { system: string; mergeHint: string }> = {
+  default: {
+    system: `你是一位专业的文档分析助手。请严格基于原文内容进行总结，不编造、不扩展任何信息。
 
 输出格式要求（必须使用中文）：
 ## 核心主题
@@ -23,15 +26,126 @@ function buildPrompts(text: string, isPartial = false, isMerge = false) {
 - 行动项2
 ...
 
-要求：简洁、客观、清晰。`;
+要求：简洁、客观、清晰。`,
+    mergeHint: '合并为一个完整、连贯的结构化总结',
+  },
+  academic: {
+    system: `你是一位学术文献分析专家。请严格基于原文内容进行分析，不编造、不扩展任何信息。
+
+输出格式要求（必须使用中文，保持学术严谨性）：
+## 研究背景
+（简述研究背景与动机）
+
+## 研究方法
+- 方法1
+- 方法2
+...
+
+## 核心发现/结果
+- 发现1
+- 发现2
+...
+
+## 结论与意义
+（总结核心结论及学术/实践意义）
+
+## 局限与展望（如有）
+- 局限1
+- 未来方向1
+...
+
+要求：术语准确、逻辑严密、数据完整引用。`,
+    mergeHint: '合并为一个完整、连贯的学术文献综述',
+  },
+  meeting: {
+    system: `你是一位专业的会议纪要整理专家。请严格基于原文内容提炼，不编造、不扩展任何信息。
+
+输出格式要求（必须使用中文，保持会议纪要的正式性）：
+## 会议核心议题
+（一句话概括本次会议核心内容）
+
+## 关键讨论要点
+- 要点1
+- 要点2
+...
+
+## 决议/共识
+- 决议1
+- 决议2
+...
+
+## 行动项
+| 事项 | 负责人 | 截止时间 |
+|------|--------|----------|
+| 行动项1 | （如有提及） | （如有提及） |
+| 行动项2 | （如有提及） | （如有提及） |
+
+## 待跟进问题（如有）
+- 问题1
+- 问题2
+...
+
+要求：条理清晰、责任明确、时间具体。`,
+    mergeHint: '合并为一个完整、连贯的会议纪要',
+  },
+  news: {
+    system: `你是一位资深新闻编辑。请严格基于原文内容进行摘要，不编造、不扩展任何信息。
+
+输出格式要求（必须使用中文，采用新闻摘要风格）：
+## 新闻标题式概括
+（用一句话概括核心事件，像新闻标题一样有力）
+
+## 5W1H 关键信息
+- **Who（谁）**：涉及的主要人物/机构
+- **When（何时）**：关键时间节点
+- **Where（何地）**：关键地点
+- **What（何事）**：核心事件
+- **Why（为何）**：原因/动机
+- **How（如何）**：方式/过程
+
+## 关键引述/数据
+- 引述或数据1
+- 引述或数据2
+...
+
+## 影响与后续
+（事件的影响及可能的后续发展）
+
+要求：客观中立、信息密度高、时效感强。`,
+    mergeHint: '合并为一个完整、连贯的新闻报道摘要',
+  },
+  minimal: {
+    system: `你是一位极简主义信息提炼专家。请严格基于原文内容，用最少文字传递最大信息量。
+
+输出格式要求（必须使用中文，极度精简）：
+## 一句话核心
+（用不超过 50 字概括全文核心）
+
+## 3 个关键要点
+1. 要点1（一句话）
+2. 要点2（一句话）
+3. 要点3（一句话）
+
+## 关键数据（如有）
+- 数据1
+- 数据2
+...
+
+要求：每个要点不超过 30 字、零废话、直击要害。`,
+    mergeHint: '合并为一个极度精简的核心信息摘要',
+  },
+};
+
+function buildPrompts(text: string, style: SummaryStyle = 'default', isPartial = false, isMerge = false) {
+  const { system, mergeHint } = STYLE_PROMPTS[style];
 
   const userPrompt = isPartial
     ? `以下是文档的一部分内容，请对其进行结构化总结：\n\n${text}`
     : isMerge
-    ? `以下是文档各部分的分段总结，请合并为一个完整、连贯的结构化总结：\n\n${text}`
+    ? `以下是文档各部分的分段总结，请${mergeHint}：\n\n${text}`
     : `请对以下文档内容进行结构化总结：\n\n${text}`;
 
-  return { systemPrompt, userPrompt };
+  return { systemPrompt: system, userPrompt };
 }
 
 export async function callKimiChat(messages: { role: string; content: string }[]) {
@@ -57,7 +171,7 @@ export async function callKimiChat(messages: { role: string; content: string }[]
   return data.choices?.[0]?.message?.content || '';
 }
 
-export async function summarizeText(text: string): Promise<string> {
+export async function summarizeText(text: string, style: SummaryStyle = 'default'): Promise<string> {
   const MAX_CHUNK = 80000;
   const chunks: string[] = [];
 
@@ -66,7 +180,7 @@ export async function summarizeText(text: string): Promise<string> {
   }
 
   if (chunks.length === 1) {
-    const { systemPrompt, userPrompt } = buildPrompts(chunks[0]);
+    const { systemPrompt, userPrompt } = buildPrompts(chunks[0], style);
     return callKimiChat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -75,7 +189,7 @@ export async function summarizeText(text: string): Promise<string> {
 
   const partialSummaries: string[] = [];
   for (const chunk of chunks) {
-    const { systemPrompt, userPrompt } = buildPrompts(chunk, true);
+    const { systemPrompt, userPrompt } = buildPrompts(chunk, style, true);
     partialSummaries.push(await callKimiChat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -83,7 +197,7 @@ export async function summarizeText(text: string): Promise<string> {
   }
 
   const combined = partialSummaries.join('\n\n---\n\n');
-  const { systemPrompt, userPrompt } = buildPrompts(combined, false, true);
+  const { systemPrompt, userPrompt } = buildPrompts(combined, style, false, true);
   return callKimiChat([
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
@@ -161,7 +275,7 @@ export interface SummarizeStreamEvent {
   message?: string;
 }
 
-export async function* summarizeTextStream(text: string): AsyncGenerator<SummarizeStreamEvent> {
+export async function* summarizeTextStream(text: string, style: SummaryStyle = 'default'): AsyncGenerator<SummarizeStreamEvent> {
   const MAX_CHUNK = 80000;
   const chunks: string[] = [];
 
@@ -170,7 +284,7 @@ export async function* summarizeTextStream(text: string): AsyncGenerator<Summari
   }
 
   if (chunks.length === 1) {
-    const { systemPrompt, userPrompt } = buildPrompts(chunks[0]);
+    const { systemPrompt, userPrompt } = buildPrompts(chunks[0], style);
     for await (const token of callKimiChatStream([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -183,7 +297,7 @@ export async function* summarizeTextStream(text: string): AsyncGenerator<Summari
   const partialSummaries: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
     yield { type: 'progress', stage: 'chunk', current: i + 1, total: chunks.length };
-    const { systemPrompt, userPrompt } = buildPrompts(chunks[i], true);
+    const { systemPrompt, userPrompt } = buildPrompts(chunks[i], style, true);
     partialSummaries.push(await callKimiChat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -193,7 +307,7 @@ export async function* summarizeTextStream(text: string): AsyncGenerator<Summari
   yield { type: 'progress', stage: 'merge', current: 1, total: 1 };
 
   const combined = partialSummaries.join('\n\n---\n\n');
-  const { systemPrompt, userPrompt } = buildPrompts(combined, false, true);
+  const { systemPrompt, userPrompt } = buildPrompts(combined, style, false, true);
   for await (const token of callKimiChatStream([
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },

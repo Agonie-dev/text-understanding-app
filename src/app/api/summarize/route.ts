@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { summarizeText, summarizeTextStream } from '@/lib/kimi';
+import { summarizeText, summarizeTextStream, SummaryStyle } from '@/lib/kimi';
 import { generateSummaryDocx } from '@/lib/docxGenerator';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, filename, stream } = await req.json();
+    const { text, filename, stream, style } = await req.json();
 
     if (!text || text.length < 10) {
       return NextResponse.json({ error: '文本内容太短，无法总结' }, { status: 400 });
     }
+
+    const summaryStyle: SummaryStyle = style || 'default';
 
     // Non-streaming fallback
     if (!stream) {
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
 
       const recordId = recordRes.data?.id;
 
-      const summary = await summarizeText(text);
+      const summary = await summarizeText(text, summaryStyle);
 
       const docxBuffer = await generateSummaryDocx(summary);
       const docxBase64 = docxBuffer.toString('base64');
@@ -89,7 +91,7 @@ export async function POST(req: NextRequest) {
 
           let fullSummary = '';
 
-          for await (const event of summarizeTextStream(text)) {
+          for await (const event of summarizeTextStream(text, summaryStyle)) {
             if (aborted) break;
             if (event.type === 'token') {
               fullSummary += event.text;
