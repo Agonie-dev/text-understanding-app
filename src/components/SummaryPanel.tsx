@@ -5,6 +5,12 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 interface SummaryPanelProps {
   text: string;
   filename: string;
+  meta?: {
+    isScanned: boolean;
+    isTruncated: boolean;
+    originalLength: number;
+    cacheHit: boolean;
+  };
 }
 
 interface StreamEvent {
@@ -17,7 +23,7 @@ interface StreamEvent {
   recordId?: string;
 }
 
-export default function SummaryPanel({ text, filename }: SummaryPanelProps) {
+export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps) {
   const [displaySummary, setDisplaySummary] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -184,6 +190,18 @@ export default function SummaryPanel({ text, filename }: SummaryPanelProps) {
 
   return (
     <div className="w-full">
+      {/* Meta hints */}
+      {meta?.cacheHit && (
+        <div className="mb-3 p-2 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700">
+          ⚡ 该文件 24 小时内已处理过，使用缓存结果
+        </div>
+      )}
+      {meta?.isTruncated && (
+        <div className="mb-3 p-2 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-700">
+          ⚠️ 文档较长（共 {meta.originalLength.toLocaleString()} 字），已提取前 {text.length.toLocaleString()} 字核心内容进行总结
+        </div>
+      )}
+
       <div className="flex gap-2">
         <button
           onClick={handleSummarize}

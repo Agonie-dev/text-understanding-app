@@ -10,15 +10,28 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'summary' | 'convert'>('summary');
   const [uploadedText, setUploadedText] = useState('');
   const [uploadedFilename, setUploadedFilename] = useState('');
+  const [uploadMeta, setUploadMeta] = useState({
+    isScanned: false,
+    isTruncated: false,
+    originalLength: 0,
+    cacheHit: false,
+  });
   const [showSummary, setShowSummary] = useState(false);
 
-  const handleUpload = (file: File, text: string, isScanned: boolean) => {
+  const handleUpload = (
+    file: File,
+    text: string,
+    meta: {
+      isScanned: boolean;
+      isTruncated: boolean;
+      originalLength: number;
+      cacheHit: boolean;
+    }
+  ) => {
     setUploadedText(text);
     setUploadedFilename(file.name);
+    setUploadMeta(meta);
     setShowSummary(true);
-    if (isScanned) {
-      console.log('扫描版 PDF，已尝试 OCR');
-    }
   };
 
   return (
@@ -65,7 +78,7 @@ export default function Home() {
               {!showSummary ? (
                 <div className="text-center py-8 text-gray-400 text-sm">请先上传文档</div>
               ) : (
-                <SummaryPanel text={uploadedText} filename={uploadedFilename} />
+                <SummaryPanel text={uploadedText} filename={uploadedFilename} meta={uploadMeta} />
               )}
             </div>
           )}

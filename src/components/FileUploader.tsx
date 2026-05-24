@@ -3,7 +3,16 @@
 import { useState, useCallback } from 'react';
 
 interface FileUploaderProps {
-  onUpload: (file: File, text: string, isScanned: boolean) => void;
+  onUpload: (
+    file: File,
+    text: string,
+    meta: {
+      isScanned: boolean;
+      isTruncated: boolean;
+      originalLength: number;
+      cacheHit: boolean;
+    }
+  ) => void;
 }
 
 export default function FileUploader({ onUpload }: FileUploaderProps) {
@@ -11,7 +20,15 @@ export default function FileUploader({ onUpload }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
+  const [warn, setWarn] = useState('');
+  const [info, setInfo] = useState('');
   const [fileInfo, setFileInfo] = useState<{ name: string; size: number; type: string } | null>(null);
+
+  const clearMessages = () => {
+    setError('');
+    setWarn('');
+    setInfo('');
+  };
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -28,7 +45,7 @@ export default function FileUploader({ onUpload }: FileUploaderProps) {
       return;
     }
 
-    setError('');
+    clearMessages();
     setUploading(true);
     setProgress(0);
     setFileInfo({ name: file.name, size: file.size, type: ext });
@@ -56,7 +73,24 @@ export default function FileUploader({ onUpload }: FileUploaderProps) {
         return;
       }
 
-      onUpload(file, data.text || '', data.isScanned || false);
+      // 截断提示
+      if (data.isTruncated) {
+        setWarn(
+          `文档较长（共 ${data.originalLength?.toLocaleString()} 字），已提取前 ${data.text?.length?.toLocaleString()} 字核心内容进行总结。`
+        );
+      }
+
+      // 缓存命中提示
+      if (data.cacheHit) {
+        setInfo('该文件 24 小时内已处理过，直接返回缓存结果 ⚡');
+      }
+
+      onUpload(file, data.text || '', {
+        isScanned: data.isScanned || false,
+        isTruncated: data.isTruncated || false,
+        originalLength: data.originalLength || 0,
+        cacheHit: data.cacheHit || false,
+      });
       setUploading(false);
     } catch (err: any) {
       clearInterval(interval);
@@ -116,6 +150,14 @@ export default function FileUploader({ onUpload }: FileUploaderProps) {
 
       {error && (
         <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>
+      )}
+
+      {warn && (
+        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">⚠️ {warn}</div>
+      )}
+
+      {info && (
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">{info}</div>
       )}
 
       {uploading && fileInfo && (
