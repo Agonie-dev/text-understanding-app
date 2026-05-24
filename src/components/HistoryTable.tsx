@@ -74,7 +74,7 @@ export default function HistoryTable() {
     <div className="w-full">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-700">历史记录</h3>
-        <span className="text-xs text-gray-400">共 {records.length} 条 · 7天后自动清理</span>
+        <span className="text-xs text-gray-400">共 {records.length} 条 · 1天后自动清理</span>
       </div>
 
       {records.length === 0 ? (

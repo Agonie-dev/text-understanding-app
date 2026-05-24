@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS history (
 CREATE OR REPLACE FUNCTION cleanup_old_history()
 RETURNS void AS $$
 BEGIN
-  DELETE FROM history WHERE created_at < NOW() - INTERVAL '7 days';
+  DELETE FROM history WHERE created_at < NOW() - INTERVAL '1 days';
 END;
 $$ LANGUAGE plpgsql;
 
