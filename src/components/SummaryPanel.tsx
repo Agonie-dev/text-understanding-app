@@ -45,13 +45,18 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
   const pendingRef = useRef('');
   const rafRef = useRef<number | null>(null);
 
-  // Clear old summary when text changes
+  // Clear old summary when text or style changes
   useEffect(() => {
     setDisplaySummary('');
     setError('');
     setCharCount(0);
     setProgressStage('');
-  }, [text]);
+    pendingRef.current = '';
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, [text, selectedStyle]);
 
   const flushDisplay = useCallback(() => {
     if (pendingRef.current) {
@@ -82,6 +87,13 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
     setDisplaySummary('');
     setCharCount(0);
     setProgressStage('');
+
+    // 强制清空残留
+    pendingRef.current = '';
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -292,7 +304,7 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
               下载文档 ↓
             </button>
           </div>
-          <div className="bg-gray-50 border rounded-lg p-4 max-h-96 overflow-y-auto">
+          <div className="bg-gray-50 border rounded-lg p-4 overflow-y-auto">
             {renderSummary(displaySummary)}
           </div>
         </div>

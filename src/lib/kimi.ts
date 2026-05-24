@@ -158,7 +158,7 @@ export async function callKimiChat(messages: { role: string; content: string }[]
     body: JSON.stringify({
       model: 'moonshot-v1-128k',
       messages,
-      temperature: 0.3,
+      temperature: 0.1,
     }),
   });
 
@@ -216,7 +216,7 @@ export async function* callKimiChatStream(messages: { role: string; content: str
     body: JSON.stringify({
       model: 'moonshot-v1-128k',
       messages,
-      temperature: 0.3,
+      temperature: 0.1,
       stream: true,
     }),
   });
