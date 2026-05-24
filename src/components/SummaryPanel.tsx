@@ -1,16 +1,59 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface SummaryPanelProps {
   text: string;
   filename: string;
 }
 
+interface StreamEvent {
+  type: 'progress' | 'token' | 'error' | 'done';
+  stage?: string;
+  current?: number;
+  total?: number;
+  text?: string;
+  message?: string;
+  recordId?: string;
+}
+
 export default function SummaryPanel({ text, filename }: SummaryPanelProps) {
-  const [summary, setSummary] = useState('');
+  const [displaySummary, setDisplaySummary] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [charCount, setCharCount] = useState(0);
+  const [progressStage, setProgressStage] = useState('');
+
+  const abortRef = useRef<AbortController | null>(null);
+  const pendingRef = useRef('');
+  const rafRef = useRef<number | null>(null);
+
+  // Clear old summary when text changes
+  useEffect(() => {
+    setDisplaySummary('');
+    setError('');
+    setCharCount(0);
+    setProgressStage('');
+  }, [text]);
+
+  const flushDisplay = useCallback(() => {
+    if (pendingRef.current) {
+      const added = pendingRef.current;
+      pendingRef.current = '';
+      setDisplaySummary((prev) => prev + added);
+      setCharCount((prev) => prev + added.length);
+    }
+    rafRef.current = null;
+  }, []);
+
+  const handleStop = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setLoading(false);
+    setProgressStage('');
+  }, []);
 
   const handleSummarize = async () => {
     if (!text || text.length < 10) {
@@ -19,27 +62,100 @@ export default function SummaryPanel({ text, filename }: SummaryPanelProps) {
     }
     setLoading(true);
     setError('');
-    setSummary('');
+    setDisplaySummary('');
+    setCharCount(0);
+    setProgressStage('');
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const res = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, filename }),
+        body: JSON.stringify({ text, filename, stream: true }),
+        signal: controller.signal,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '总结失败');
-      setSummary(data.summary);
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '请求失败');
+      }
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const dataStr = trimmed.slice(5).trim();
+          if (!dataStr) continue;
+
+          try {
+            const event: StreamEvent = JSON.parse(dataStr);
+
+            if (event.type === 'token' && event.text) {
+              fullText += event.text;
+              pendingRef.current += event.text;
+              if (!rafRef.current) {
+                rafRef.current = requestAnimationFrame(flushDisplay);
+              }
+            } else if (event.type === 'progress') {
+              setProgressStage(
+                event.stage === 'chunk'
+                  ? `正在处理第 ${event.current}/${event.total} 段...`
+                  : '正在合并总结...'
+              );
+            } else if (event.type === 'error') {
+              throw new Error(event.message || '生成出错');
+            } else if (event.type === 'done') {
+              setProgressStage('生成完成');
+            }
+          } catch (parseErr: any) {
+            if (parseErr.message === '生成出错' || parseErr.message === '请求失败') {
+              throw parseErr;
+            }
+            // ignore malformed SSE lines
+          }
+        }
+      }
+
+      // Ensure all pending text is flushed
+      if (pendingRef.current) {
+        setDisplaySummary((prev) => prev + pendingRef.current);
+        setCharCount((prev) => prev + pendingRef.current.length);
+        pendingRef.current = '';
+      }
     } catch (err: any) {
-      setError(err.message);
+      if (err.name === 'AbortError') {
+        setError('生成已中断');
+      } else {
+        setError(err.message || '总结失败');
+      }
     } finally {
       setLoading(false);
+      setProgressStage('');
+      abortRef.current = null;
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     }
   };
 
   const downloadDocx = () => {
-    if (!summary) return;
-    const blob = new Blob([summary], { type: 'text/plain' });
+    if (!displaySummary) return;
+    const blob = new Blob([displaySummary], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -68,25 +184,53 @@ export default function SummaryPanel({ text, filename }: SummaryPanelProps) {
 
   return (
     <div className="w-full">
-      <button
-        onClick={handleSummarize}
-        disabled={loading}
-        className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-      >
+      <div className="flex gap-2">
+        <button
+          onClick={handleSummarize}
+          disabled={loading}
+          className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+        >
+          {loading && (
+            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          )}
+          {loading ? 'AI 正在生成...' : '生成 AI 智能总结'}
+        </button>
+
         {loading && (
-          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
+          <button
+            onClick={handleStop}
+            className="py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-medium transition-colors border border-red-200 flex-shrink-0"
+          >
+            停止生成
+          </button>
         )}
-        {loading ? 'AI 正在总结...' : '生成 AI 智能总结'}
-      </button>
+      </div>
+
+      {progressStage && (
+        <div className="mt-3 p-2 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700 flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            {progressStage}
+          </span>
+          <span className="text-xs text-blue-500 font-medium">已生成 {charCount.toLocaleString()} 字</span>
+        </div>
+      )}
+
+      {!loading && charCount > 0 && (
+        <div className="mt-2 text-xs text-gray-400 text-right">共 {charCount.toLocaleString()} 字</div>
+      )}
 
       {error && (
         <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>
       )}
 
-      {summary && (
+      {displaySummary && (
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-gray-700">总结结果</h3>
@@ -98,7 +242,7 @@ export default function SummaryPanel({ text, filename }: SummaryPanelProps) {
             </button>
           </div>
           <div className="bg-gray-50 border rounded-lg p-4 max-h-96 overflow-y-auto">
-            {renderSummary(summary)}
+            {renderSummary(displaySummary)}
           </div>
         </div>
       )}
