@@ -1,16 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import FileUploader from '@/components/FileUploader';
 import SummaryPanel from '@/components/SummaryPanel';
 import Converter from '@/components/Converter';
 import HistoryTable from '@/components/HistoryTable';
+import QAPanel from '@/components/QAPanel';
+
+interface UploadMeta {
+  isScanned: boolean;
+  isTruncated: boolean;
+  originalLength: number;
+  cacheHit: boolean;
+}
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'summary' | 'convert'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'convert' | 'qa'>('summary');
   const [uploadedText, setUploadedText] = useState('');
   const [uploadedFilename, setUploadedFilename] = useState('');
-  const [uploadMeta, setUploadMeta] = useState({
+  const [uploadMeta, setUploadMeta] = useState<UploadMeta>({
     isScanned: false,
     isTruncated: false,
     originalLength: 0,
@@ -18,21 +26,47 @@ export default function Home() {
   });
   const [showSummary, setShowSummary] = useState(false);
 
-  const handleUpload = (
-    file: File,
-    text: string,
-    meta: {
-      isScanned: boolean;
-      isTruncated: boolean;
-      originalLength: number;
-      cacheHit: boolean;
-    }
-  ) => {
-    setUploadedText(text);
-    setUploadedFilename(file.name);
-    setUploadMeta(meta);
-    setShowSummary(true);
-  };
+  // QA 状态
+  const [qaDocumentId, setQaDocumentId] = useState<string>('');
+  const [qaMeta, setQaMeta] = useState({
+    isTruncated: false,
+    originalLength: 0,
+    extractedLength: 0,
+  });
+  const [showQA, setShowQA] = useState(false);
+
+  const handleUpload = useCallback(
+    async (file: File, text: string, meta: UploadMeta) => {
+      setUploadedText(text);
+      setUploadedFilename(file.name);
+      setUploadMeta(meta);
+      setShowSummary(true);
+
+      // 同步上传到 QA 后端
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch('/api/rag/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await res.json();
+        if (res.ok && data.documentId) {
+          setQaDocumentId(data.documentId);
+          setQaMeta({
+            isTruncated: data.isTruncated || false,
+            originalLength: data.originalLength || 0,
+            extractedLength: data.extractedLength || 0,
+          });
+          setShowQA(true);
+        }
+      } catch (e) {
+        console.error('QA upload error:', e);
+      }
+    },
+    []
+  );
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -62,6 +96,16 @@ export default function Home() {
               🤖 AI 智能总结
             </button>
             <button
+              onClick={() => setActiveTab('qa')}
+              className={`pb-2 text-sm font-medium transition-colors ${
+                activeTab === 'qa'
+                  ? 'text-indigo-600 border-b-2 border-indigo-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              💬 文档问答
+            </button>
+            <button
               onClick={() => setActiveTab('convert')}
               className={`pb-2 text-sm font-medium transition-colors ${
                 activeTab === 'convert'
@@ -79,6 +123,20 @@ export default function Home() {
                 <div className="text-center py-8 text-gray-400 text-sm">请先上传文档</div>
               ) : (
                 <SummaryPanel text={uploadedText} filename={uploadedFilename} meta={uploadMeta} />
+              )}
+            </div>
+          )}
+
+          {activeTab === 'qa' && (
+            <div>
+              {!showQA ? (
+                <div className="text-center py-8 text-gray-400 text-sm">请先上传文档</div>
+              ) : (
+                <QAPanel
+                  documentId={qaDocumentId}
+                  filename={uploadedFilename}
+                  meta={qaMeta}
+                />
               )}
             </div>
           )}
