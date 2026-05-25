@@ -93,15 +93,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 3. 提取文本
-    console.log('Processing file:', file.name, 'size:', file.size, 'type:', file.type);
-    const { text, isScanned } = await extractTextFromFile(buffer, file.type, file.name);
+    const { text, isScanned, kimiFileId } = await extractTextFromFile(buffer, file.type, file.name);
     console.log('Extracted text length:', text.length, 'isScanned:', isScanned);
 
-    // 4. 扫描版PDF / 无法提取 → 直接报错
-    if (isScanned || text.length === 0) {
+    // 4. 扫描版PDF / 无法提取 → 尝试 OCR，若 OCR 也失败则报错
+    if (text.length === 0) {
       return NextResponse.json(
-        { error: '该文档无法提取文字，请上传可编辑版本（非扫描版/图片版PDF）' },
+        { error: isScanned ? '扫描版 PDF OCR 识别失败，请尝试其他文件' : '无法从文件中提取文本内容' },
         { status: 400 }
       );
     }
@@ -109,13 +107,13 @@ export async function POST(req: NextRequest) {
     // 5. 截断处理（超过80000字）
     const { text: truncatedText, truncated, originalLength } = truncateByParagraphs(text, MAX_TEXT_LENGTH);
 
-    // 6. 存入缓存
+    // 6. 存入缓存（扫描件也缓存）
     const { error: cacheError } = await supabase.from('file_cache').insert({
       md5,
       filename: file.name,
       file_size: file.size,
       text: truncatedText,
-      is_scanned: false,
+      is_scanned: isScanned,
       is_truncated: truncated,
       original_length: originalLength,
     });
@@ -144,7 +142,7 @@ export async function POST(req: NextRequest) {
       size: file.size,
       type: file.type || ext,
       text: truncatedText,
-      isScanned: false,
+      isScanned,
       isTruncated: truncated,
       originalLength,
       cacheHit: false,

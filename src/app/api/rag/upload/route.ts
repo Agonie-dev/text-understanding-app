@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const { text, isScanned } = await extractTextFromFile(
+    const { text, isScanned, kimiFileId } = await extractTextFromFile(
       buffer,
       file.type || 'application/octet-stream',
       file.name
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     if (!text || text.trim().length === 0) {
       return NextResponse.json(
-        { error: isScanned ? '扫描版 PDF 暂不支持问答，请先 OCR 处理' : '无法从文件中提取文本' },
+        { error: isScanned ? '扫描版 PDF OCR 识别失败，请尝试其他文件' : '无法从文件中提取文本内容' },
         { status: 400 }
       );
     }
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
         extracted_text: extractedText,
         is_truncated: isTruncated,
         original_length: text.length,
+        kimi_file_id: kimiFileId || null,
       })
       .select()
       .single();

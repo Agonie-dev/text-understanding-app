@@ -1,10 +1,11 @@
 import mammoth from 'mammoth';
+import { uploadFileToKimi, extractTextWithKimiOCR } from './kimi';
 
 export async function extractTextFromFile(
   buffer: Buffer,
   mimeType: string,
   filename: string
-): Promise<{ text: string; isScanned: boolean }> {
+): Promise<{ text: string; isScanned: boolean; kimiFileId?: string }> {
   const ext = filename.toLowerCase().split('.').pop();
 
   if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
@@ -17,13 +18,13 @@ export async function extractTextFromFile(
   }
 
   if (ext === 'pdf' || mimeType.includes('pdf')) {
-    return extractFromPdf(buffer);
+    return extractFromPdf(buffer, filename);
   }
 
   throw new Error('不支持的文件格式');
 }
 
-async function extractFromPdf(buffer: Buffer): Promise<{ text: string; isScanned: boolean }> {
+async function extractFromPdf(buffer: Buffer, filename: string): Promise<{ text: string; isScanned: boolean; kimiFileId?: string }> {
   try {
     // @ts-ignore: pdf-parse index.js has debug code that crashes in serverless
     const pdfParseModule: any = await import('pdf-parse/lib/pdf-parse.js');
@@ -35,7 +36,15 @@ async function extractFromPdf(buffer: Buffer): Promise<{ text: string; isScanned
       return { text, isScanned: false };
     }
 
-    return { text: '', isScanned: true };
+    // 扫描件 → 上传 Kimi 做 OCR
+    const kimiFileId = await uploadFileToKimi(buffer, filename);
+    const ocrText = await extractTextWithKimiOCR(kimiFileId);
+
+    if (ocrText && ocrText.trim().length > 50) {
+      return { text: ocrText.trim(), isScanned: true, kimiFileId };
+    }
+
+    return { text: '', isScanned: true, kimiFileId };
   } catch (e: any) {
     console.error('pdfParse error:', e.message);
     return { text: '', isScanned: true };

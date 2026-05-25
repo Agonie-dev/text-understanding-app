@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { callKimiChatStream } from '@/lib/kimi';
 
-const MAX_DOC_CHARS = 70000; // 预留空间给历史消息和 system prompt
+const MAX_DOC_CHARS = 70000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
     // 2. 确定会话
     let activeSessionId = sessionId;
     if (!activeSessionId) {
-      // 创建新会话
       const { data: newSession } = await supabase
         .from('chat_sessions')
         .insert({ document_id: documentId, title: message.slice(0, 30) })
@@ -56,29 +55,38 @@ export async function POST(req: NextRequest) {
       content: message.trim(),
     });
 
-    // 5. 截断文档文本
-    const docText = doc.extracted_text.slice(0, MAX_DOC_CHARS);
+    // 5. 构建 messages
+    let messages: { role: string; content: string }[] = [];
 
-    // 6. 构建 messages
-    const systemPrompt = `你是一个专业的文档问答助手。请严格基于以下文档内容回答用户的问题，不要编造文档中没有的信息。
-
-如果用户的问题与文档内容无关，请礼貌地告知用户你无法回答。
-
-文档内容：
----
-${docText}
----`;
-
-    const messages: { role: string; content: string }[] = [
-      { role: 'system', content: systemPrompt },
-    ];
-
-    // 加入历史消息
-    if (historyMessages && historyMessages.length > 0) {
-      messages.push(...historyMessages.slice(-10));
+    if (doc.kimi_file_id) {
+      // 扫描件：使用 Kimi 文件引用（不走纯文本链路）
+      messages = [
+        {
+          role: 'system',
+          content: '你是一个专业的文档问答助手。请严格基于用户上传的文档内容回答问题，不要编造文档中没有的信息。如果问题与文档无关，请礼貌告知。',
+        },
+      ];
+      if (historyMessages && historyMessages.length > 0) {
+        messages.push(...historyMessages.slice(-10));
+      }
+      messages.push({
+        role: 'user',
+        content: `基于文档 ${doc.kimi_file_id} 回答：${message.trim()}`,
+      });
+    } else {
+      // 普通文档：走纯文本链路
+      const docText = doc.extracted_text.slice(0, MAX_DOC_CHARS);
+      messages = [
+        {
+          role: 'system',
+          content: `你是一个专业的文档问答助手。请严格基于以下文档内容回答用户的问题，不要编造文档中没有的信息。\n\n如果用户的问题与文档内容无关，请礼貌地告知用户你无法回答。\n\n文档内容：\n---\n${docText}\n---`,
+        },
+      ];
+      if (historyMessages && historyMessages.length > 0) {
+        messages.push(...historyMessages.slice(-10));
+      }
+      messages.push({ role: 'user', content: message.trim() });
     }
-
-    messages.push({ role: 'user', content: message.trim() });
 
     // 7. 流式返回
     if (stream) {

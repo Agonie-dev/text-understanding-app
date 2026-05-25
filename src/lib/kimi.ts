@@ -315,3 +315,42 @@ export async function* summarizeTextStream(text: string, style: SummaryStyle = '
     yield { type: 'token', text: token };
   }
 }
+
+// ===== File Upload & OCR =====
+
+export async function uploadFileToKimi(buffer: Buffer, filename: string): Promise<string> {
+  const blob = new Blob([new Uint8Array(buffer)]);
+  const formData = new FormData();
+  formData.append('file', blob, filename);
+  formData.append('purpose', 'file-extract');
+
+  const res = await fetch(`${KIMI_BASE_URL}/files`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${KIMI_API_KEY}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Kimi file upload error: ${res.status} ${err}`);
+  }
+
+  const data = await res.json();
+  return data.id;
+}
+
+export async function extractTextWithKimiOCR(fileId: string): Promise<string> {
+  const res = await callKimiChat([
+    {
+      role: 'system',
+      content: '你是一个专业的 OCR 文本提取助手。请提取这份文档中的全部文本内容，保留段落结构。如果是扫描件，请尽可能识别图片中的文字。直接输出原文，不要添加额外说明。',
+    },
+    {
+      role: 'user',
+      content: `请提取文件 ${fileId} 中的全部文本内容。`,
+    },
+  ]);
+  return res;
+}
