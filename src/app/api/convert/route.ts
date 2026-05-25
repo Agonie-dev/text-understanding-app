@@ -1,20 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { convertWordToPdf, convertPdfToWord } from '@/lib/converter';
+import { extractTextFromFile } from '@/lib/fileProcessor';
+import {
+  generateSummaryPdf,
+  generateTextToDocx,
+  generateTextToHtml,
+  generateTextToMarkdown,
+  generateTextToTxt,
+} from '@/lib/converter';
 import { supabase } from '@/lib/supabase';
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    const targetFormat = formData.get('targetFormat') as string;
+    const targetFormat = (formData.get('targetFormat') as string)?.toLowerCase();
 
     if (!file || !targetFormat) {
       return NextResponse.json({ error: '缺少文件或目标格式' }, { status: 400 });
     }
 
+    const allowedExts = ['.pdf', '.docx', '.doc', '.txt', '.md', '.markdown'];
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!allowedExts.includes(ext)) {
+      return NextResponse.json({ error: '不支持的文件格式' }, { status: 400 });
+    }
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const ext = file.name.split('.').pop()?.toLowerCase();
+
+    // 提取文本
+    const { text } = await extractTextFromFile(buffer, file.type || 'application/octet-stream', file.name);
+    if (!text || text.trim().length === 0) {
+      return NextResponse.json({ error: '无法从文件中提取文本内容' }, { status: 400 });
+    }
 
     const recordRes = await supabase
       .from('history')
@@ -32,31 +50,51 @@ export async function POST(req: NextRequest) {
 
     let resultBuffer: Buffer;
     let outputFilename: string;
+    let mimeType: string;
 
-    if (targetFormat === 'pdf' && (ext === 'docx' || ext === 'doc')) {
-      resultBuffer = await convertWordToPdf(buffer);
-      outputFilename = file.name.replace(/\.docx?$/i, '.pdf');
-    } else if (targetFormat === 'docx' && ext === 'pdf') {
-      resultBuffer = await convertPdfToWord(buffer);
-      outputFilename = file.name.replace(/\.pdf$/i, '.docx');
-    } else {
-      return NextResponse.json({ error: '不支持的转换类型' }, { status: 400 });
+    switch (targetFormat) {
+      case 'pdf':
+        resultBuffer = await generateSummaryPdf(text);
+        outputFilename = file.name.replace(/\.[^.]+$/, '') + '.pdf';
+        mimeType = 'application/pdf';
+        break;
+      case 'docx':
+        resultBuffer = await generateTextToDocx(text);
+        outputFilename = file.name.replace(/\.[^.]+$/, '') + '.docx';
+        mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        break;
+      case 'html':
+        resultBuffer = await generateTextToHtml(text, file.name);
+        outputFilename = file.name.replace(/\.[^.]+$/, '') + '.html';
+        mimeType = 'text/html';
+        break;
+      case 'md':
+      case 'markdown':
+        resultBuffer = generateTextToMarkdown(text);
+        outputFilename = file.name.replace(/\.[^.]+$/, '') + '.md';
+        mimeType = 'text/markdown';
+        break;
+      case 'txt':
+        resultBuffer = generateTextToTxt(text);
+        outputFilename = file.name.replace(/\.[^.]+$/, '') + '.txt';
+        mimeType = 'text/plain';
+        break;
+      default:
+        return NextResponse.json({ error: '不支持的目标格式: ' + targetFormat }, { status: 400 });
     }
 
     const base64 = resultBuffer.toString('base64');
 
     await supabase
       .from('history')
-      .update({
-        status: 'completed',
-        result_url: base64,
-      })
+      .update({ status: 'completed', result_url: base64 })
       .eq('id', recordId);
 
     return NextResponse.json({
       success: true,
       filename: outputFilename,
       base64,
+      mimeType,
       recordId,
     });
   } catch (err: any) {

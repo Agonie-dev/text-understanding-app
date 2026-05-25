@@ -2,19 +2,45 @@
 
 import { useState } from 'react';
 
+const SUPPORTED_INPUT_EXTS = ['.pdf', '.doc', '.docx', '.txt', '.md', '.markdown'];
+
+const FORMAT_OPTIONS: { value: string; label: string }[] = [
+  { value: 'pdf', label: 'PDF (.pdf)' },
+  { value: 'docx', label: 'Word (.docx)' },
+  { value: 'html', label: '网页 (.html)' },
+  { value: 'md', label: 'Markdown (.md)' },
+  { value: 'txt', label: '纯文本 (.txt)' },
+];
+
+function getDefaultTarget(ext: string): string {
+  if (ext === 'pdf') return 'docx';
+  if (ext === 'docx' || ext === 'doc') return 'pdf';
+  return 'pdf';
+}
+
+function getMimeType(format: string): string {
+  switch (format) {
+    case 'pdf': return 'application/pdf';
+    case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'html': return 'text/html';
+    case 'md': return 'text/markdown';
+    case 'txt': return 'text/plain';
+    default: return 'application/octet-stream';
+  }
+}
+
 export default function Converter() {
   const [file, setFile] = useState<File | null>(null);
-  const [targetFormat, setTargetFormat] = useState<'pdf' | 'docx'>('pdf');
+  const [targetFormat, setTargetFormat] = useState<string>('pdf');
   const [converting, setConverting] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ filename: string; base64: string } | null>(null);
+  const [result, setResult] = useState<{ filename: string; base64: string; mimeType: string } | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    const ext = f.name.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') setTargetFormat('docx');
-    if (ext === 'docx' || ext === 'doc') setTargetFormat('pdf');
+    const ext = f.name.split('.').pop()?.toLowerCase() || '';
+    setTargetFormat(getDefaultTarget(ext));
     setFile(f);
     setError('');
     setResult(null);
@@ -22,6 +48,10 @@ export default function Converter() {
 
   const handleConvert = async () => {
     if (!file) return;
+    if (file.name.toLowerCase().endsWith('.' + targetFormat)) {
+      setError('源格式和目标格式相同，无需转换');
+      return;
+    }
     setConverting(true);
     setError('');
 
@@ -36,7 +66,11 @@ export default function Converter() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '转换失败');
-      setResult({ filename: data.filename, base64: data.base64 });
+      setResult({
+        filename: data.filename,
+        base64: data.base64,
+        mimeType: data.mimeType || getMimeType(targetFormat),
+      });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -51,8 +85,7 @@ export default function Converter() {
     for (let i = 0; i < byteString.length; i++) {
       bytes[i] = byteString.charCodeAt(i);
     }
-    const mime = targetFormat === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    const blob = new Blob([bytes], { type: mime });
+    const blob = new Blob([bytes], { type: result.mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -66,22 +99,23 @@ export default function Converter() {
       <div className="flex items-center gap-3">
         <input
           type="file"
-          accept=".pdf,.doc,.docx"
+          accept=".pdf,.doc,.docx,.txt,.md,.markdown"
           onChange={handleFileChange}
           className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
         />
       </div>
 
       {file && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-gray-600">转换为：</span>
           <select
             value={targetFormat}
-            onChange={(e) => setTargetFormat(e.target.value as 'pdf' | 'docx')}
+            onChange={(e) => setTargetFormat(e.target.value)}
             className="text-sm border rounded-lg px-3 py-2"
           >
-            <option value="pdf">PDF</option>
-            <option value="docx">Word (.docx)</option>
+            {FORMAT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <button
             onClick={handleConvert}

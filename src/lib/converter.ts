@@ -261,3 +261,68 @@ export async function generateSummaryPdf(summaryText: string): Promise<Buffer> {
     doc.end();
   });
 }
+
+export async function generateTextToDocx(text: string): Promise<Buffer> {
+  const lines = text.split('\n').filter((l: string) => l.trim());
+  const children: Paragraph[] = lines.map(
+    (line: string) =>
+      new Paragraph({
+        children: [new TextRun({ text: line.trim(), size: 22 })],
+        spacing: { after: 100 },
+      })
+  );
+
+  const doc = new Document({
+    sections: [{ properties: {}, children }],
+  });
+
+  return Packer.toBuffer(doc);
+}
+
+export async function generateTextToHtml(text: string, title?: string): Promise<Buffer> {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const body = escaped
+    .split('\n')
+    .map((line) => {
+      const t = line.trim();
+      if (t.startsWith('## ')) return `<h2>${t.replace('## ', '')}</h2>`;
+      if (t.startsWith('# ')) return `<h1>${t.replace('# ', '')}</h1>`;
+      if (t.startsWith('- ')) return `<li>${t.replace('- ', '')}</li>`;
+      if (!t) return '';
+      return `<p>${t}</p>`;
+    })
+    .join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>${title || '转换结果'}</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}
+h1{font-size:1.5rem;font-weight:700;margin:1.5rem 0 .5rem;color:#1a1a1a}
+h2{font-size:1.25rem;font-weight:700;margin:1.25rem 0 .5rem;color:#2d2d2d}
+ul{margin:.5rem 0;padding-left:1.5rem}
+li{margin:.25rem 0}
+p{margin:.5rem 0}
+</style>
+</head>
+<body>
+${body}
+</body>
+</html>`;
+
+  return Buffer.from(html, 'utf-8');
+}
+
+export function generateTextToMarkdown(text: string): Buffer {
+  return Buffer.from(text, 'utf-8');
+}
+
+export function generateTextToTxt(text: string): Buffer {
+  return Buffer.from(text, 'utf-8');
+}
