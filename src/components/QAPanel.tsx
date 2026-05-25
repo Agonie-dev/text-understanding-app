@@ -35,6 +35,7 @@ export default function QAPanel({ documentId, filename, meta }: QAPanelProps) {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // 加载会话列表
@@ -79,10 +80,13 @@ export default function QAPanel({ documentId, filename, meta }: QAPanelProps) {
 
   const prevMsgCountRef = useRef(0);
 
-  // 自动滚动：只在消息数量增加时滚动（新消息到来），流式逐字更新不滚动
+  // 自动滚动：只在消息数量增加时滚动消息容器内部，不滚动整个页面
   useEffect(() => {
     if (messages.length > prevMsgCountRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const container = messagesContainerRef.current;
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      }
       prevMsgCountRef.current = messages.length;
     }
   }, [messages.length]);
@@ -334,7 +338,9 @@ export default function QAPanel({ documentId, filename, meta }: QAPanelProps) {
       )}
 
       {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto space-y-3 mb-3 px-1">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto space-y-3 mb-3 px-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
         {messages.length === 0 && (
           <div className="h-full flex items-center justify-center text-gray-400 text-sm">
             <div className="text-center">
