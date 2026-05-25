@@ -234,8 +234,10 @@ export default function QAPanel({ documentId, filename, meta, onDocumentDeleted 
       setLoading(false);
       setStreaming(false);
       abortRef.current = null;
-      // 不刷新数据库，保留本地流式状态
-      // 切换会话时会自动 loadMessages
+      // 流式结束后同步数据库状态
+      if (activeSessionId) {
+        await loadMessages(activeSessionId);
+      }
     }
   };
 
@@ -380,7 +382,7 @@ export default function QAPanel({ documentId, filename, meta, onDocumentDeleted 
             <div
               className={`max-w-[85%] rounded-xl px-4 py-2.5 text-sm ${
                 msg.role === 'user'
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-blue-100 text-gray-800 border border-blue-200'
                   : 'bg-gray-100 text-gray-800 border border-gray-200'
               }`}
             >
