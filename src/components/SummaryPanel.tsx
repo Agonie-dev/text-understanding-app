@@ -444,7 +444,7 @@ ${displaySummary
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-gray-700">总结结果</h3>
-          <div className="relative">
+          <div className="relative export-dropdown">
             <button
               onClick={() => setExportOpen((v) => !v)}
               className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
