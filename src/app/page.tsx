@@ -61,8 +61,8 @@ export default function Home() {
           });
           setShowQA(true);
 
-          // 上传成功后自动清理超过1小时的旧文档
-          fetch('/api/rag/cleanup?hours=1').catch((e) => console.error('Cleanup error:', e));
+          // 上传成功后自动清理超过24小时的旧文档
+          fetch('/api/rag/cleanup?hours=24').catch((e) => console.error('Cleanup error:', e));
         }
       } catch (e) {
         console.error('QA upload error:', e);

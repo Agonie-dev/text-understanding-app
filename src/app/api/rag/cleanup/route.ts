@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const hours = parseInt(searchParams.get('hours') || '1', 10);
+    const hours = parseInt(searchParams.get('hours') || '24', 10);
 
     if (isNaN(hours) || hours < 1) {
       return NextResponse.json({ error: 'hours 参数无效' }, { status: 400 });
