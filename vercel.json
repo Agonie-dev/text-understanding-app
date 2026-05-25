@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/rag/cleanup?hours=1",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
