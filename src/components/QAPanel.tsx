@@ -77,10 +77,15 @@ export default function QAPanel({ documentId, filename, meta }: QAPanelProps) {
     }
   }, [activeSessionId, loadMessages]);
 
-  // 自动滚动到底部
+  const prevMsgCountRef = useRef(0);
+
+  // 自动滚动：只在消息数量增加时滚动（新消息到来），流式逐字更新不滚动
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streaming]);
+    if (messages.length > prevMsgCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      prevMsgCountRef.current = messages.length;
+    }
+  }, [messages.length]);
 
   const handleNewSession = async () => {
     try {
@@ -209,8 +214,8 @@ export default function QAPanel({ documentId, filename, meta }: QAPanelProps) {
       setLoading(false);
       setStreaming(false);
       abortRef.current = null;
-      // 刷新消息列表以获取持久化消息
-      loadMessages(activeSessionId);
+      // 不刷新数据库，保留本地流式状态
+      // 切换会话时会自动 loadMessages
     }
   };
 
