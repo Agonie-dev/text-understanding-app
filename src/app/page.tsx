@@ -1,12 +1,25 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Suspense, lazy } from 'react';
 import FileUploader from '@/components/FileUploader';
-import SummaryPanel from '@/components/SummaryPanel';
-import Converter from '@/components/Converter';
 import HistoryTable from '@/components/HistoryTable';
-import QAPanel from '@/components/QAPanel';
-import Translator from '@/components/Translator';
+
+// 懒加载大组件，减少首屏体积
+const SummaryPanel = lazy(() => import('@/components/SummaryPanel'));
+const QAPanel = lazy(() => import('@/components/QAPanel'));
+const Converter = lazy(() => import('@/components/Converter'));
+const Translator = lazy(() => import('@/components/Translator'));
+
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <svg className="animate-spin h-8 w-8 text-indigo-600" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      </svg>
+    </div>
+  );
+}
 
 interface UploadMeta {
   isScanned: boolean;
@@ -88,10 +101,10 @@ export default function Home() {
         </section>
 
         <section className="bg-white rounded-xl shadow-sm border p-6">
-          <div className="flex gap-4 border-b mb-4">
+          <div className="flex gap-4 border-b mb-4 overflow-x-auto">
             <button
               onClick={() => setActiveTab('summary')}
-              className={`pb-2 text-sm font-medium transition-colors ${
+              className={`pb-2 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'summary'
                   ? 'text-indigo-600 border-b-2 border-indigo-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -101,7 +114,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('qa')}
-              className={`pb-2 text-sm font-medium transition-colors ${
+              className={`pb-2 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'qa'
                   ? 'text-indigo-600 border-b-2 border-indigo-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -111,7 +124,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('translate')}
-              className={`pb-2 text-sm font-medium transition-colors ${
+              className={`pb-2 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'translate'
                   ? 'text-indigo-600 border-b-2 border-indigo-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -121,7 +134,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('convert')}
-              className={`pb-2 text-sm font-medium transition-colors ${
+              className={`pb-2 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'convert'
                   ? 'text-indigo-600 border-b-2 border-indigo-600'
                   : 'text-gray-500 hover:text-gray-700'
@@ -136,7 +149,9 @@ export default function Home() {
               {!showSummary ? (
                 <div className="text-center py-8 text-gray-400 text-sm">请先上传文档</div>
               ) : (
-                <SummaryPanel text={uploadedText} filename={uploadedFilename} meta={uploadMeta} />
+                <Suspense fallback={<LoadingFallback />}>
+                  <SummaryPanel text={uploadedText} filename={uploadedFilename} meta={uploadMeta} />
+                </Suspense>
               )}
             </div>
           )}
@@ -146,31 +161,39 @@ export default function Home() {
               {!showQA ? (
                 <div className="text-center py-8 text-gray-400 text-sm">请先上传文档</div>
               ) : (
-                <QAPanel
-                  documentId={qaDocumentId}
-                  filename={uploadedFilename}
-                  meta={qaMeta}
-                  onDocumentDeleted={() => {
-                    setShowQA(false);
-                    setQaDocumentId('');
-                    setActiveTab('summary');
-                  }}
-                />
+                <Suspense fallback={<LoadingFallback />}>
+                  <QAPanel
+                    documentId={qaDocumentId}
+                    filename={uploadedFilename}
+                    meta={qaMeta}
+                    onDocumentDeleted={() => {
+                      setShowQA(false);
+                      setQaDocumentId('');
+                      setActiveTab('summary');
+                    }}
+                  />
+                </Suspense>
               )}
             </div>
           )}
 
           {activeTab === 'translate' && (
-            <Translator />
+            <Suspense fallback={<LoadingFallback />}>
+              <Translator />
+            </Suspense>
           )}
 
           {activeTab === 'convert' && (
-            <Converter />
+            <Suspense fallback={<LoadingFallback />}>
+              <Converter />
+            </Suspense>
           )}
         </section>
 
         <section className="bg-white rounded-xl shadow-sm border p-6">
-          <HistoryTable />
+          <Suspense fallback={<LoadingFallback />}>
+            <HistoryTable />
+          </Suspense>
         </section>
       </main>
 

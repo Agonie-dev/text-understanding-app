@@ -13,14 +13,12 @@ function truncateByParagraphs(text: string, maxLength: number): { text: string; 
   if (text.length <= maxLength) {
     return { text, truncated: false, originalLength: text.length };
   }
-  // 按段落智能截断
   const paragraphs = text.split(/\n\s*\n/);
   let result = '';
   for (const para of paragraphs) {
     if ((result + para).length > maxLength) break;
     result += (result ? '\n\n' : '') + para;
   }
-  // 如果按段落截断后还是空或太短，直接硬截断
   if (result.length < maxLength * 0.5) {
     result = text.slice(0, maxLength);
   }
@@ -40,17 +38,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '文件大小超过 20MB 限制' }, { status: 400 });
     }
 
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-      'text/markdown',
-    ];
     const allowedExts = ['.pdf', '.docx', '.txt', '.md', '.markdown'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
 
-    if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
+    if (!allowedExts.includes(ext)) {
       return NextResponse.json({ error: '仅支持 Word (.docx)、PDF、TXT 和 Markdown 文件' }, { status: 400 });
     }
 
@@ -59,19 +50,17 @@ export async function POST(req: NextRequest) {
 
     // 1. 计算 MD5
     const md5 = computeMD5(buffer);
-    console.log('File MD5:', md5);
 
     // 2. 查缓存（24小时内）
     const cacheSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: cached } = await supabase
       .from('file_cache')
-      .select('*')
+      .select('text,is_scanned,is_truncated,original_length')
       .eq('md5', md5)
       .gte('created_at', cacheSince)
       .maybeSingle();
 
     if (cached) {
-      console.log('Cache hit for MD5:', md5);
       await supabase.from('history').insert({
         filename: file.name,
         file_size: file.size,
@@ -79,24 +68,25 @@ export async function POST(req: NextRequest) {
         operation_type: 'upload',
         status: 'completed',
       });
-      return NextResponse.json({
-        success: true,
-        id: cached.id,
-        filename: file.name,
-        size: file.size,
-        type: file.type || ext,
-        text: cached.text,
-        isScanned: cached.is_scanned,
-        isTruncated: cached.is_truncated,
-        originalLength: cached.original_length,
-        cacheHit: true,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          filename: file.name,
+          size: file.size,
+          type: file.type || ext,
+          text: cached.text,
+          isScanned: cached.is_scanned,
+          isTruncated: cached.is_truncated,
+          originalLength: cached.original_length,
+          cacheHit: true,
+        },
+        { headers: { 'Cache-Control': 'public, max-age=3600' } }
+      );
     }
 
-    const { text, isScanned, kimiFileId } = await extractTextFromFile(buffer, file.type, file.name);
-    console.log('Extracted text length:', text.length, 'isScanned:', isScanned);
+    // 3. 提取文本
+    const { text, isScanned } = await extractTextFromFile(buffer, file.type, file.name);
 
-    // 4. 扫描版PDF / 无法提取 → 尝试 OCR，若 OCR 也失败则报错
     if (text.length === 0) {
       return NextResponse.json(
         { error: isScanned ? '扫描版 PDF OCR 识别失败，请尝试其他文件' : '无法从文件中提取文本内容' },
@@ -104,11 +94,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. 截断处理（超过80000字）
+    // 4. 截断处理
     const { text: truncatedText, truncated, originalLength } = truncateByParagraphs(text, MAX_TEXT_LENGTH);
 
-    // 6. 存入缓存（扫描件也缓存）
-    const { error: cacheError } = await supabase.from('file_cache').insert({
+    // 5. 存入缓存
+    await supabase.from('file_cache').insert({
       md5,
       filename: file.name,
       file_size: file.size,
@@ -118,39 +108,33 @@ export async function POST(req: NextRequest) {
       original_length: originalLength,
     });
 
-    if (cacheError) console.error('Cache insert error:', cacheError);
-
-    // 7. 记录历史
-    const { data, error } = await supabase
-      .from('history')
-      .insert({
-        filename: file.name,
-        file_size: file.size,
-        file_type: file.type || ext,
-        operation_type: 'upload',
-        status: 'completed',
-      })
-      .select()
-      .single();
-
-    if (error) console.error('Supabase insert error:', error);
-
-    return NextResponse.json({
-      success: true,
-      id: data?.id,
+    // 6. 记录历史
+    await supabase.from('history').insert({
       filename: file.name,
-      size: file.size,
-      type: file.type || ext,
-      text: truncatedText,
-      isScanned,
-      isTruncated: truncated,
-      originalLength,
-      cacheHit: false,
+      file_size: file.size,
+      file_type: file.type || ext,
+      operation_type: 'upload',
+      status: 'completed',
     });
+
+    return NextResponse.json(
+      {
+        success: true,
+        filename: file.name,
+        size: file.size,
+        type: file.type || ext,
+        text: truncatedText,
+        isScanned,
+        isTruncated: truncated,
+        originalLength,
+        cacheHit: false,
+      },
+      { headers: { 'Cache-Control': 'public, max-age=3600' } }
+    );
   } catch (err: any) {
     console.error('Upload error:', err);
     return NextResponse.json(
-      { error: err.message || '上传失败', stack: err.stack, name: err.name },
+      { error: err.message || '上传失败' },
       { status: 500 }
     );
   }
