@@ -34,10 +34,10 @@ export default function FileUploader({ onUpload }: FileUploaderProps) {
     if (!files || files.length === 0) return;
     const file = files[0];
 
-    const allowedExts = ['.pdf', '.docx'];
+    const allowedExts = ['.pdf', '.docx', '.txt', '.md', '.markdown'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowedExts.includes(ext)) {
-      setError('仅支持 Word (.docx) 和 PDF 文件');
+      setError('仅支持 Word (.docx)、PDF、TXT 和 Markdown 文件');
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
@@ -138,12 +138,12 @@ export default function FileUploader({ onUpload }: FileUploaderProps) {
           <p className="mb-2 text-sm text-gray-500">
             <span className="font-semibold">点击上传</span> 或拖拽文件到此处
           </p>
-          <p className="text-xs text-gray-400">支持 Word / PDF，最大 20MB</p>
+          <p className="text-xs text-gray-400">支持 Word / PDF / TXT / Markdown，最大 20MB</p>
         </div>
         <input
           type="file"
           className="hidden"
-          accept=".pdf,.docx"
+          accept=".pdf,.docx,.txt,.md,.markdown"
           onChange={(e) => handleFiles(e.target.files)}
         />
       </label>

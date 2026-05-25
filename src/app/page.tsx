@@ -94,7 +94,7 @@ export default function Home() {
       </main>
 
       <footer className="text-center py-6 text-xs text-gray-400">
-        text-understanding-app · 支持 Word / PDF
+        text-understanding-app · 支持 Word / PDF / TXT / Markdown
       </footer>
     </div>
   );

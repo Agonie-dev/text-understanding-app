@@ -41,10 +41,24 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
   const [progressStage, setProgressStage] = useState('');
   const [selectedStyle, setSelectedStyle] = useState<SummaryStyle>('default');
   const [useStream, setUseStream] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const pendingRef = useRef('');
   const rafRef = useRef<number | null>(null);
+
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.export-dropdown')) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
 
   // Clear old summary when text or style changes
   useEffect(() => {
@@ -203,15 +217,101 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
     }
   };
 
-  const downloadDocx = () => {
+  const downloadTxt = () => {
     if (!displaySummary) return;
-    const blob = new Blob([displaySummary], { type: 'text/plain' });
+    const blob = new Blob([displaySummary], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename.replace(/\.[^.]+$/, '') + '_总结.txt';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadMd = () => {
+    if (!displaySummary) return;
+    const blob = new Blob([displaySummary], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.replace(/\.[^.]+$/, '') + '_总结.md';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadHtml = () => {
+    if (!displaySummary) return;
+    const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>总结 — ${filename.replace(/\.[^.]+$/, '')}</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}
+h1{font-size:1.5rem;font-weight:700;margin:1.5rem 0 .5rem;color:#1a1a1a}
+h2{font-size:1.25rem;font-weight:700;margin:1.25rem 0 .5rem;color:#2d2d2d}
+ul{margin:.5rem 0;padding-left:1.5rem}
+li{margin:.25rem 0}
+p{margin:.5rem 0}
+</style>
+</head>
+<body>
+${displaySummary
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .split('\n')
+  .map(line => {
+    const t = line.trim();
+    if (t.startsWith('## ')) return `<h2>${t.replace('## ', '')}</h2>`;
+    if (t.startsWith('# ')) return `<h1>${t.replace('# ', '')}</h1>`;
+    if (t.startsWith('- ')) return `<li>${t.replace('- ', '')}</li>`;
+    if (!t) return '';
+    return `<p>${t}</p>`;
+  })
+  .join('\n')}
+</body>
+</html>`;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.replace(/\.[^.]+$/, '') + '_总结.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadDocx = async (targetFormat: 'docx' | 'pdf' = 'docx') => {
+    if (!displaySummary) return;
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary: displaySummary, format: targetFormat }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || '导出失败');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename.replace(/\.[^.]+$/, '') + '_总结.' + targetFormat;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExport = async (format: 'txt' | 'md' | 'html' | 'docx' | 'pdf') => {
+    setExportOpen(false);
+    try {
+      if (format === 'txt') downloadTxt();
+      else if (format === 'md') downloadMd();
+      else if (format === 'html') downloadHtml();
+      else if (format === 'docx') await downloadDocx('docx');
+      else if (format === 'pdf') await downloadDocx('pdf');
+    } catch (e: any) {
+      setError(e.message || '导出失败');
+    }
   };
 
   const renderSummary = (content: string) => {
@@ -344,12 +444,33 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-gray-700">总结结果</h3>
+          <div className="relative">
             <button
-              onClick={downloadDocx}
-              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+              onClick={() => setExportOpen((v) => !v)}
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
             >
-              下载文档 ↓
+              导出 ↓
             </button>
+            {exportOpen && (
+              <div className="absolute right-0 mt-1 w-36 bg-white border rounded-lg shadow-lg z-10 py-1">
+                {[
+                  { key: 'txt', label: '纯文本 (.txt)' },
+                  { key: 'md', label: 'Markdown (.md)' },
+                  { key: 'html', label: '网页 (.html)' },
+                  { key: 'docx', label: 'Word (.docx)' },
+                  { key: 'pdf', label: 'PDF (.pdf)' },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => handleExport(item.key as any)}
+                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           </div>
           <div className="bg-gray-50 border rounded-lg p-4 overflow-y-auto">
             {renderSummary(displaySummary)}

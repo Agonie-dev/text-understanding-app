@@ -7,6 +7,10 @@ export async function extractTextFromFile(
 ): Promise<{ text: string; isScanned: boolean }> {
   const ext = filename.toLowerCase().split('.').pop();
 
+  if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
+    return { text: buffer.toString('utf-8'), isScanned: false };
+  }
+
   if (ext === 'docx' || ext === 'doc' || mimeType.includes('word')) {
     const result = await mammoth.extractRawText({ buffer });
     return { text: result.value, isScanned: false };

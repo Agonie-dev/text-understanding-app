@@ -44,12 +44,14 @@ export async function POST(req: NextRequest) {
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'text/markdown',
     ];
-    const allowedExts = ['.pdf', '.docx'];
+    const allowedExts = ['.pdf', '.docx', '.txt', '.md', '.markdown'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
 
     if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
-      return NextResponse.json({ error: '仅支持 Word (.docx) 和 PDF 文件' }, { status: 400 });
+      return NextResponse.json({ error: '仅支持 Word (.docx)、PDF、TXT 和 Markdown 文件' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();

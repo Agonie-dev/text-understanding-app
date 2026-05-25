@@ -193,3 +193,71 @@ export async function convertPdfToWord(buffer: Buffer): Promise<Buffer> {
 
   return Packer.toBuffer(doc);
 }
+
+export async function generateSummaryPdf(summaryText: string): Promise<Buffer> {
+  setupPdfkitEnv();
+
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const doc = new PDFDocument({ font: '' });
+
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    doc.registerFont('unifont', getFontPath());
+
+    const margin = 72;
+    const maxWidth = 612 - margin * 2;
+    const pageHeight = 792;
+
+    const lines = summaryText.split('\n');
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        doc.y += 8;
+        continue;
+      }
+
+      // 自动分页
+      if (doc.y > pageHeight - margin - 40) {
+        doc.addPage();
+      }
+
+      if (trimmed.startsWith('## ')) {
+        doc.font('unifont').fontSize(16);
+        doc.text(trimmed.replace('## ', ''), margin, doc.y, {
+          width: maxWidth,
+          align: 'left',
+        });
+        doc.y += 10;
+      } else if (trimmed.startsWith('# ')) {
+        doc.font('unifont').fontSize(20);
+        doc.text(trimmed.replace('# ', ''), margin, doc.y, {
+          width: maxWidth,
+          align: 'left',
+        });
+        doc.y += 14;
+      } else if (trimmed.startsWith('- ')) {
+        doc.font('unifont').fontSize(12);
+        doc.text('• ' + trimmed.replace('- ', ''), margin + 12, doc.y, {
+          width: maxWidth - 12,
+          align: 'left',
+          lineGap: 4,
+        });
+        doc.y += 4;
+      } else {
+        doc.font('unifont').fontSize(12);
+        doc.text(trimmed, margin, doc.y, {
+          width: maxWidth,
+          align: 'left',
+          lineGap: 4,
+        });
+        doc.y += 4;
+      }
+    }
+
+    doc.end();
+  });
+}
