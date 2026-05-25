@@ -6,6 +6,7 @@ import SummaryPanel from '@/components/SummaryPanel';
 import Converter from '@/components/Converter';
 import HistoryTable from '@/components/HistoryTable';
 import QAPanel from '@/components/QAPanel';
+import Translator from '@/components/Translator';
 
 interface UploadMeta {
   isScanned: boolean;
@@ -15,7 +16,7 @@ interface UploadMeta {
 }
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'summary' | 'convert' | 'qa'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'convert' | 'qa' | 'translate'>('summary');
   const [uploadedText, setUploadedText] = useState('');
   const [uploadedFilename, setUploadedFilename] = useState('');
   const [uploadMeta, setUploadMeta] = useState<UploadMeta>({
@@ -109,6 +110,16 @@ export default function Home() {
               💬 文档问答
             </button>
             <button
+              onClick={() => setActiveTab('translate')}
+              className={`pb-2 text-sm font-medium transition-colors ${
+                activeTab === 'translate'
+                  ? 'text-indigo-600 border-b-2 border-indigo-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🌐 全文翻译
+            </button>
+            <button
               onClick={() => setActiveTab('convert')}
               className={`pb-2 text-sm font-medium transition-colors ${
                 activeTab === 'convert'
@@ -147,6 +158,10 @@ export default function Home() {
                 />
               )}
             </div>
+          )}
+
+          {activeTab === 'translate' && (
+            <Translator />
           )}
 
           {activeTab === 'convert' && (
