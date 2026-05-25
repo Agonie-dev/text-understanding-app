@@ -136,6 +136,11 @@ export default function Home() {
                   documentId={qaDocumentId}
                   filename={uploadedFilename}
                   meta={qaMeta}
+                  onDocumentDeleted={() => {
+                    setShowQA(false);
+                    setQaDocumentId('');
+                    setActiveTab('summary');
+                  }}
                 />
               )}
             </div>

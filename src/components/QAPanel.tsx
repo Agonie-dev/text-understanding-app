@@ -24,9 +24,10 @@ interface QAPanelProps {
     originalLength: number;
     extractedLength: number;
   };
+  onDocumentDeleted?: () => void;
 }
 
-export default function QAPanel({ documentId, filename, meta }: QAPanelProps) {
+export default function QAPanel({ documentId, filename, meta, onDocumentDeleted }: QAPanelProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -119,6 +120,21 @@ export default function QAPanel({ documentId, filename, meta }: QAPanelProps) {
           setActiveSessionId(remaining[0]?.id || '');
           setMessages([]);
         }
+      }
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!window.confirm('确定删除该文档及所有对话记录？此操作不可恢复。')) return;
+    try {
+      const res = await fetch(`/api/rag/documents?id=${documentId}`, { method: 'DELETE' });
+      if (res.ok) {
+        onDocumentDeleted?.();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || '删除失败');
       }
     } catch (e: any) {
       setError(e.message);
@@ -291,6 +307,12 @@ export default function QAPanel({ documentId, filename, meta }: QAPanelProps) {
             className="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 font-medium transition-colors"
           >
             + 新会话
+          </button>
+          <button
+            onClick={handleDeleteDocument}
+            className="text-xs px-3 py-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 font-medium transition-colors"
+          >
+            🗑 删除文档
           </button>
         </div>
         {meta?.isTruncated && (
