@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit';
 import { Document, Paragraph, TextRun, Packer } from 'docx';
 import * as fs from 'fs';
 import * as path from 'path';
+import { extractTextFromFile } from './fileProcessor';
 
 // pdfkit 在 serverless 环境中找不到内置字体数据文件，需要手动指定路径
 const PDFKIT_DATA_DIR = path.join(process.cwd(), 'public', 'pdfkit-data');
@@ -172,11 +173,11 @@ export async function convertWordToPdf(buffer: Buffer): Promise<Buffer> {
 }
 
 export async function convertPdfToWord(buffer: Buffer): Promise<Buffer> {
-  // @ts-ignore: bypass pdf-parse index.js debug code
-  const pdfParseModule: any = await import('pdf-parse/lib/pdf-parse.js');
-  const pdfParse = pdfParseModule.default || pdfParseModule;
-  const parsed = await pdfParse(buffer);
-  const text = parsed.text || '';
+  // PDF 转 Word：使用 Kimi API 提取文本（serverless-safe）
+  const { text } = await extractTextFromFile(buffer, 'application/pdf', 'input.pdf');
+  if (!text) {
+    throw new Error('无法从 PDF 提取文本');
+  }
 
   const lines = text.split('\n').filter((l: string) => l.trim());
   const children: Paragraph[] = lines.map(
