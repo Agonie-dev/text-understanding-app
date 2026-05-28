@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { extractTextFromFile } from '@/lib/fileProcessor';
-import { supabase } from '@/lib/supabase';
 
 const MAX_TEXT_LENGTH = 80000;
 
 export async function POST(req: NextRequest) {
   try {
+    // 安全检查环境变量
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json(
+        { error: 'Supabase 环境变量未配置', step: 'env_check' },
+        { status: 500 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get('file') as File;
 
@@ -53,7 +63,10 @@ export async function POST(req: NextRequest) {
     const isTruncated = text.length > MAX_TEXT_LENGTH;
     const extractedText = isTruncated ? text.slice(0, MAX_TEXT_LENGTH) : text;
 
-    // 步骤2：插入 chat_documents
+    // 步骤2：创建 Supabase client（直接在路由里，不用模块）
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // 步骤3：插入 chat_documents
     let docData;
     try {
       const { data, error } = await supabase
@@ -85,7 +98,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 步骤3：创建默认会话
+    // 步骤4：创建默认会话
     let sessionData;
     try {
       const { data, error } = await supabase
