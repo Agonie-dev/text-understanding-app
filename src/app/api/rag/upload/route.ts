@@ -25,11 +25,23 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const { text, isScanned, kimiFileId } = await extractTextFromFile(
-      buffer,
-      file.type || 'application/octet-stream',
-      file.name
-    );
+    // 步骤1：提取文本
+    let extractResult;
+    try {
+      extractResult = await extractTextFromFile(
+        buffer,
+        file.type || 'application/octet-stream',
+        file.name
+      );
+    } catch (extractErr: any) {
+      console.error('Extract error:', extractErr);
+      return NextResponse.json(
+        { error: '文本提取失败: ' + extractErr.message },
+        { status: 500 }
+      );
+    }
+
+    const { text, isScanned, kimiFileId } = extractResult;
 
     if (!text || text.trim().length === 0) {
       return NextResponse.json(
@@ -41,41 +53,62 @@ export async function POST(req: NextRequest) {
     const isTruncated = text.length > MAX_TEXT_LENGTH;
     const extractedText = isTruncated ? text.slice(0, MAX_TEXT_LENGTH) : text;
 
-    const { data, error } = await supabase
-      .from('chat_documents')
-      .insert({
-        filename: file.name,
-        file_size: file.size,
-        extracted_text: extractedText,
-        is_truncated: isTruncated,
-        original_length: text.length,
-        kimi_file_id: kimiFileId || null,
-      })
-      .select()
-      .single();
+    // 步骤2：插入 chat_documents
+    let docData;
+    try {
+      const { data, error } = await supabase
+        .from('chat_documents')
+        .insert({
+          filename: file.name,
+          file_size: file.size,
+          extracted_text: extractedText,
+          is_truncated: isTruncated,
+          original_length: text.length,
+          kimi_file_id: kimiFileId || null,
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Insert chat_document error:', error);
-      return NextResponse.json({ error: '保存文档失败: ' + error.message }, { status: 500 });
+      if (error) {
+        console.error('Insert chat_document error:', error);
+        return NextResponse.json(
+          { error: '保存文档失败: ' + error.message, code: error.code },
+          { status: 500 }
+        );
+      }
+      docData = data;
+    } catch (dbErr: any) {
+      console.error('DB insert error:', dbErr);
+      return NextResponse.json(
+        { error: '数据库插入失败: ' + dbErr.message },
+        { status: 500 }
+      );
     }
 
-    // 同时创建一个默认会话
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('chat_sessions')
-      .insert({
-        document_id: data.id,
-        title: '新会话',
-      })
-      .select()
-      .single();
+    // 步骤3：创建默认会话
+    let sessionData;
+    try {
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .insert({
+          document_id: docData.id,
+          title: '新会话',
+        })
+        .select()
+        .single();
 
-    if (sessionError) {
-      console.error('Insert session error:', sessionError);
+      if (error) {
+        console.error('Insert session error:', error);
+      } else {
+        sessionData = data;
+      }
+    } catch (sessionErr: any) {
+      console.error('Session insert error:', sessionErr);
     }
 
     return NextResponse.json({
       success: true,
-      documentId: data.id,
+      documentId: docData.id,
       sessionId: sessionData?.id,
       filename: file.name,
       isTruncated,
@@ -84,6 +117,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('RAG upload error:', err);
-    return NextResponse.json({ error: err.message || '上传失败' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || '上传失败', stack: err.stack },
+      { status: 500 }
+    );
   }
 }
