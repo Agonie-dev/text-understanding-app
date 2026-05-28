@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 const MAX_TEXT_LENGTH = 80000;
 
 export async function POST(req: NextRequest) {
+  let fileName = 'unknown';
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '缺少文件' }, { status: 400 });
     }
 
+    fileName = file.name;
     const allowedExts = ['.pdf', '.docx', '.doc', '.txt', '.md', '.markdown'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowedExts.includes(ext)) {
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest) {
     } catch (extractErr: any) {
       console.error('Extract error:', extractErr);
       return NextResponse.json(
-        { error: '文本提取失败: ' + extractErr.message },
+        { error: '文本提取失败: ' + extractErr.message, step: 'extract' },
         { status: 500 }
       );
     }
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest) {
       if (error) {
         console.error('Insert chat_document error:', error);
         return NextResponse.json(
-          { error: '保存文档失败: ' + error.message, code: error.code },
+          { error: '保存文档失败: ' + error.message, code: error.code, step: 'insert_doc' },
           { status: 500 }
         );
       }
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
     } catch (dbErr: any) {
       console.error('DB insert error:', dbErr);
       return NextResponse.json(
-        { error: '数据库插入失败: ' + dbErr.message },
+        { error: '数据库插入失败: ' + dbErr.message, step: 'insert_doc' },
         { status: 500 }
       );
     }
@@ -116,9 +118,9 @@ export async function POST(req: NextRequest) {
       extractedLength: extractedText.length,
     });
   } catch (err: any) {
-    console.error('RAG upload error:', err);
+    console.error('RAG upload fatal error:', err);
     return NextResponse.json(
-      { error: err.message || '上传失败', stack: err.stack },
+      { error: err.message || '上传失败', stack: err.stack, fileName, step: 'fatal' },
       { status: 500 }
     );
   }
