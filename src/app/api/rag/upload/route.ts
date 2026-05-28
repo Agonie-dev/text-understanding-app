@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractTextFromFile } from '@/lib/fileProcessor';
 import { supabase } from '@/lib/supabase';
 
-const MAX_TEXT_LENGTH = 80000; // 约 80K 字符，控制在 128K tokens 以内
+const MAX_TEXT_LENGTH = 80000;
 
 export async function POST(req: NextRequest) {
   try {

@@ -1,6 +1,9 @@
 import mammoth from 'mammoth';
 import { uploadFileToKimi, extractTextWithKimiOCR } from './kimi';
 
+const KIMI_BASE_URL = process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
+const KIMI_API_KEY = process.env.KIMI_API_KEY!;
+
 export async function extractTextFromFile(
   buffer: Buffer,
   mimeType: string,
@@ -25,28 +28,32 @@ export async function extractTextFromFile(
 }
 
 async function extractFromPdf(buffer: Buffer, filename: string): Promise<{ text: string; isScanned: boolean; kimiFileId?: string }> {
+  // PDF 直接走 Kimi API，避免本地解析库在 serverless 环境下崩溃
   try {
-    // @ts-ignore: pdf-parse index.js has debug code that crashes in serverless
-    const pdfParseModule: any = await import('pdf-parse/lib/pdf-parse.js');
-    const pdfParse = pdfParseModule.default || pdfParseModule;
-    const parsed = await pdfParse(buffer);
-    const text = parsed.text?.trim() || '';
+    const kimiFileId = await uploadFileToKimi(buffer, filename);
 
-    if (text.length > 50) {
-      return { text, isScanned: false };
+    // 先尝试用 Kimi file-extract 接口获取文本
+    const res = await fetch(`${KIMI_BASE_URL}/files/${kimiFileId}/content`, {
+      headers: { 'Authorization': `Bearer ${KIMI_API_KEY}` },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const text = data.content?.trim() || '';
+      if (text.length > 50) {
+        return { text, isScanned: false, kimiFileId };
+      }
     }
 
-    // 扫描件 → 上传 Kimi 做 OCR
-    const kimiFileId = await uploadFileToKimi(buffer, filename);
+    // 如果提取的文本太短，说明是扫描件，走 OCR
     const ocrText = await extractTextWithKimiOCR(kimiFileId);
-
     if (ocrText && ocrText.trim().length > 50) {
       return { text: ocrText.trim(), isScanned: true, kimiFileId };
     }
 
     return { text: '', isScanned: true, kimiFileId };
   } catch (e: any) {
-    console.error('pdfParse error:', e.message);
+    console.error('PDF processing error:', e.message);
     return { text: '', isScanned: true };
   }
 }
