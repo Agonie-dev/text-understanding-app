@@ -1,25 +1,12 @@
 'use client';
 
-import { useState, useCallback, Suspense, lazy } from 'react';
+import { useState, useCallback } from 'react';
 import FileUploader from '@/components/FileUploader';
 import HistoryTable from '@/components/HistoryTable';
-
-// 懒加载大组件，减少首屏体积
-const SummaryPanel = lazy(() => import('@/components/SummaryPanel'));
-const QAPanel = lazy(() => import('@/components/QAPanel'));
-const Converter = lazy(() => import('@/components/Converter'));
-const Translator = lazy(() => import('@/components/Translator'));
-
-function LoadingFallback() {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <svg className="animate-spin h-8 w-8 text-indigo-600" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
-    </div>
-  );
-}
+import SummaryPanel from '@/components/SummaryPanel';
+import QAPanel from '@/components/QAPanel';
+import Converter from '@/components/Converter';
+import Translator from '@/components/Translator';
 
 interface UploadMeta {
   isScanned: boolean;
@@ -149,9 +136,7 @@ export default function Home() {
               {!showSummary ? (
                 <div className="text-center py-8 text-gray-400 text-sm">请先上传文档</div>
               ) : (
-                <Suspense fallback={<LoadingFallback />}>
-                  <SummaryPanel text={uploadedText} filename={uploadedFilename} meta={uploadMeta} />
-                </Suspense>
+                <SummaryPanel text={uploadedText} filename={uploadedFilename} meta={uploadMeta} />
               )}
             </div>
           )}
@@ -161,39 +146,27 @@ export default function Home() {
               {!showQA ? (
                 <div className="text-center py-8 text-gray-400 text-sm">请先上传文档</div>
               ) : (
-                <Suspense fallback={<LoadingFallback />}>
-                  <QAPanel
-                    documentId={qaDocumentId}
-                    filename={uploadedFilename}
-                    meta={qaMeta}
-                    onDocumentDeleted={() => {
-                      setShowQA(false);
-                      setQaDocumentId('');
-                      setActiveTab('summary');
-                    }}
-                  />
-                </Suspense>
+                <QAPanel
+                  documentId={qaDocumentId}
+                  filename={uploadedFilename}
+                  meta={qaMeta}
+                  onDocumentDeleted={() => {
+                    setShowQA(false);
+                    setQaDocumentId('');
+                    setActiveTab('summary');
+                  }}
+                />
               )}
             </div>
           )}
 
-          {activeTab === 'translate' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <Translator />
-            </Suspense>
-          )}
+          {activeTab === 'translate' && <Translator />}
 
-          {activeTab === 'convert' && (
-            <Suspense fallback={<LoadingFallback />}>
-              <Converter />
-            </Suspense>
-          )}
+          {activeTab === 'convert' && <Converter />}
         </section>
 
         <section className="bg-white rounded-xl shadow-sm border p-6">
-          <Suspense fallback={<LoadingFallback />}>
-            <HistoryTable />
-          </Suspense>
+          <HistoryTable />
         </section>
       </main>
 
