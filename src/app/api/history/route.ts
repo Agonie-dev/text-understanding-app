@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET() {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // 读取前先清理 1 天前的旧记录
+    await supabase
+      .from('history')
+      .delete()
+      .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
     const { data, error } = await supabase
       .from('history')
       .select('*')
