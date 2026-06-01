@@ -21,6 +21,7 @@ interface SummaryPanelProps {
     originalLength: number;
     cacheHit: boolean;
   };
+  visitorId?: string;
 }
 
 interface StreamEvent {
@@ -33,7 +34,7 @@ interface StreamEvent {
   recordId?: string;
 }
 
-export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps) {
+export default function SummaryPanel({ text, filename, meta, visitorId }: SummaryPanelProps) {
   const [displaySummary, setDisplaySummary] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -119,7 +120,7 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
         const res = await fetch('/api/summarize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, filename, stream: false, style: selectedStyle }),
+          body: JSON.stringify({ text, filename, stream: false, style: selectedStyle, visitorId }),
           signal: controller.signal,
         });
 
@@ -137,7 +138,7 @@ export default function SummaryPanel({ text, filename, meta }: SummaryPanelProps
       const res = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, filename, stream: true, style: selectedStyle }),
+        body: JSON.stringify({ text, filename, stream: true, style: selectedStyle, visitorId }),
         signal: controller.signal,
       });
 

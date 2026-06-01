@@ -24,10 +24,11 @@ interface QAPanelProps {
     originalLength: number;
     extractedLength: number;
   };
+  visitorId?: string;
   onDocumentDeleted?: () => void;
 }
 
-export default function QAPanel({ documentId, filename, meta, onDocumentDeleted }: QAPanelProps) {
+export default function QAPanel({ documentId, filename, meta, visitorId, onDocumentDeleted }: QAPanelProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -171,6 +172,7 @@ export default function QAPanel({ documentId, filename, meta, onDocumentDeleted 
           sessionId: activeSessionId,
           message: text,
           stream: true,
+          visitorId,
         }),
         signal: controller.signal,
       });

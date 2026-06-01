@@ -2,13 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { summarizeText, summarizeTextStream, SummaryStyle } from '@/lib/kimi';
 import { generateSummaryDocx } from '@/lib/docxGenerator';
 import { supabase } from '@/lib/supabase';
+import { checkAndConsumeQuota } from '@/lib/quota';
+import { isAdmin } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, filename, stream, style } = await req.json();
+    const { text, filename, stream, style, visitorId } = await req.json();
 
     if (!text || text.length < 10) {
       return NextResponse.json({ error: '文本内容太短，无法总结' }, { status: 400 });
+    }
+
+    // 游客配额检查（管理员跳过）
+    const admin = await isAdmin(req);
+    if (!admin) {
+      const quota = await checkAndConsumeQuota(visitorId || 'unknown', 'summary');
+      if (!quota.allowed) {
+        return NextResponse.json({ error: quota.message, code: 'QUOTA_EXCEEDED' }, { status: 429 });
+      }
     }
 
     const summaryStyle: SummaryStyle = style || 'default';

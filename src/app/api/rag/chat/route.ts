@@ -1,18 +1,32 @@
 import { NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { callKimiChatStream } from '@/lib/kimi';
+import { checkAndConsumeQuota } from '@/lib/quota';
+import { isAdmin } from '@/lib/auth';
 
 const MAX_DOC_CHARS = 70000;
 
 export async function POST(req: NextRequest) {
   try {
-    const { documentId, sessionId, message, stream = true } = await req.json();
+    const { documentId, sessionId, message, stream = true, visitorId } = await req.json();
 
     if (!documentId || !message?.trim()) {
       return new Response(
         JSON.stringify({ error: '缺少 documentId 或 message' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // 游客配额检查（管理员跳过）
+    const admin = await isAdmin(req);
+    if (!admin) {
+      const quota = await checkAndConsumeQuota(visitorId || 'unknown', 'qa');
+      if (!quota.allowed) {
+        return new Response(
+          JSON.stringify({ error: quota.message, code: 'QUOTA_EXCEEDED' }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // 1. 获取文档
