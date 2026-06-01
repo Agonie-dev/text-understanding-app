@@ -36,6 +36,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: '没有提供有效的更新字段' }, { status: 400 });
     }
 
+    if (typeof is_default === 'boolean' && is_default) {
+      await supabase.from('api_keys').update({ is_default: false }).neq('id', id);
+    }
+
     const { error } = await supabase.from('api_keys').update(updates).eq('id', id);
     if (error) throw error;
 

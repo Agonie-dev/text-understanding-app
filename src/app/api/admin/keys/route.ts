@@ -29,6 +29,11 @@ export async function POST(req: NextRequest) {
 
     const encrypted = encrypt(api_key);
 
+    // 如果设为默认，先取消其他默认
+    if (is_default) {
+      await supabase.from('api_keys').update({ is_default: false }).neq('id', '00000000-0000-0000-0000-000000000000');
+    }
+
     const { data, error } = await supabase.from('api_keys').insert({
       name,
       api_key: encrypted,
