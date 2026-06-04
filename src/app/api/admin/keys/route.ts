@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (!adminCheck.ok) return adminCheck.response!;
 
   try {
-    const { name, api_key, base_url, is_default } = await req.json();
+    const { name, api_key, base_url, model, auth_type, is_default } = await req.json();
     if (!name || !api_key) {
       return NextResponse.json({ error: '名称和 API Key 不能为空' }, { status: 400 });
     }
@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
       name,
       api_key: encrypted,
       base_url: base_url || 'https://api.moonshot.cn/v1',
+      model: model || null,
+      auth_type: auth_type || 'bearer',
       is_active: true,
       is_default: !!is_default,
     }).select().single();

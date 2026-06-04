@@ -6,6 +6,7 @@ interface ApiKeyItem {
   id: string;
   name: string;
   baseUrl: string;
+  model?: string;
   isActive: boolean;
   isDefault: boolean;
 }
@@ -31,6 +32,8 @@ export default function AdminDrawer({ isOpen, onClose, onLogout }: AdminDrawerPr
   const [newName, setNewName] = useState('');
   const [newKey, setNewKey] = useState('');
   const [newUrl, setNewUrl] = useState('https://api.moonshot.cn/v1');
+  const [newModel, setNewModel] = useState('');
+  const [newAuthType, setNewAuthType] = useState<'bearer' | 'api-key'>('bearer');
   const [newDefault, setNewDefault] = useState(false);
 
   // Password change
@@ -78,6 +81,8 @@ export default function AdminDrawer({ isOpen, onClose, onLogout }: AdminDrawerPr
           name: newName.trim(),
           api_key: newKey.trim(),
           base_url: newUrl.trim(),
+          model: newModel.trim() || undefined,
+          auth_type: newAuthType,
           is_default: newDefault,
         }),
       });
@@ -85,6 +90,8 @@ export default function AdminDrawer({ isOpen, onClose, onLogout }: AdminDrawerPr
         showMsg('添加成功');
         setNewName('');
         setNewKey('');
+        setNewModel('');
+        setNewAuthType('bearer');
         setNewDefault(false);
         fetchData();
       } else {
@@ -239,6 +246,7 @@ export default function AdminDrawer({ isOpen, onClose, onLogout }: AdminDrawerPr
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-800 truncate">{k.name}</div>
                     <div className="text-xs text-gray-400 truncate">{k.baseUrl}</div>
+                    {k.model && <div className="text-xs text-blue-400 truncate">模型: {k.model}</div>}
                   </div>
                   <span className={`text-xs px-1.5 py-0.5 rounded ${k.isDefault ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
                     {k.isDefault ? '默认' : ''}
@@ -293,6 +301,37 @@ export default function AdminDrawer({ isOpen, onClose, onLogout }: AdminDrawerPr
                 placeholder="Base URL"
                 className="w-full px-2 py-1.5 border rounded text-sm"
               />
+              <input
+                type="text"
+                value={newModel}
+                onChange={(e) => setNewModel(e.target.value)}
+                placeholder="模型名称（可选，如 mimo-v2.5-pro、gpt-4）"
+                className="w-full px-2 py-1.5 border rounded text-sm"
+              />
+              <div className="flex gap-2 text-sm text-gray-600">
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="auth_type"
+                    value="bearer"
+                    checked={newAuthType === 'bearer'}
+                    onChange={() => setNewAuthType('bearer')}
+                    className="w-4 h-4"
+                  />
+                  Authorization: Bearer
+                </label>
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="auth_type"
+                    value="api-key"
+                    checked={newAuthType === 'api-key'}
+                    onChange={() => setNewAuthType('api-key')}
+                    className="w-4 h-4"
+                  />
+                  api-key
+                </label>
+              </div>
               <label className="flex items-center gap-2 text-sm text-gray-600">
                 <input
                   type="checkbox"

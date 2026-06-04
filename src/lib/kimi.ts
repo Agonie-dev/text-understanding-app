@@ -3,51 +3,24 @@ import { getActiveApiKey } from './admin';
 // Fallback: 环境变量中的默认 Kimi Key
 const FALLBACK_API_KEY = process.env.KIMI_API_KEY!;
 const FALLBACK_BASE_URL = process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
-
-// 根据 baseUrl 推断模型和请求格式
-function inferApiFormat(baseUrl: string) {
-  const url = baseUrl.toLowerCase();
-  
-  if (url.includes('moonshot')) {
-    return {
-      model: 'moonshot-v1-128k',
-      authHeader: (key: string) => ({ 'Authorization': `Bearer ${key}` }),
-    };
-  }
-  
-  if (url.includes('mimo') || url.includes('xiaomi')) {
-    return {
-      model: 'mimo-v2.5-pro',
-      authHeader: (key: string) => ({ 'api-key': key }),
-    };
-  }
-  
-  // 默认 OpenAI 兼容格式
-  return {
-    model: 'gpt-4',
-    authHeader: (key: string) => ({ 'Authorization': `Bearer ${key}` }),
-  };
-}
+const FALLBACK_MODEL = 'moonshot-v1-128k';
+const FALLBACK_AUTH_TYPE = 'bearer';
 
 async function getApiConfig(): Promise<{ apiKey: string; baseUrl: string; model: string; authHeaders: Record<string, string> }> {
   const dbKey = await getActiveApiKey();
   if (dbKey) {
-    const format = inferApiFormat(dbKey.baseUrl);
-    return {
-      apiKey: dbKey.apiKey,
-      baseUrl: dbKey.baseUrl,
-      model: format.model,
-      authHeaders: format.authHeader(dbKey.apiKey),
-    };
+    const model = dbKey.model || (dbKey.baseUrl.includes('moonshot') ? 'moonshot-v1-128k' : 'gpt-4');
+    const authType = dbKey.authType || 'bearer';
+    const authHeaders = authType === 'api-key' 
+      ? { 'api-key': dbKey.apiKey }
+      : { 'Authorization': `Bearer ${dbKey.apiKey}` };
+    return { apiKey: dbKey.apiKey, baseUrl: dbKey.baseUrl, model, authHeaders };
   }
   // 数据库没有配置时 fallback 到环境变量
-  const format = inferApiFormat(FALLBACK_BASE_URL);
-  return {
-    apiKey: FALLBACK_API_KEY,
-    baseUrl: FALLBACK_BASE_URL,
-    model: format.model,
-    authHeaders: format.authHeader(FALLBACK_API_KEY),
-  };
+  const authHeaders = FALLBACK_AUTH_TYPE === 'api-key'
+    ? { 'api-key': FALLBACK_API_KEY }
+    : { 'Authorization': `Bearer ${FALLBACK_API_KEY}` };
+  return { apiKey: FALLBACK_API_KEY, baseUrl: FALLBACK_BASE_URL, model: FALLBACK_MODEL, authHeaders };
 }
 
 export type SummaryStyle = 'default' | 'academic' | 'meeting' | 'news' | 'minimal';
