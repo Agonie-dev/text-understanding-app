@@ -4,7 +4,7 @@ import { getActiveApiKey } from './admin';
 const FALLBACK_API_KEY = process.env.KIMI_API_KEY!;
 const FALLBACK_BASE_URL = process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
 const FALLBACK_MODEL = 'moonshot-v1-128k';
-const FALLBACK_AUTH_TYPE = 'bearer';
+const FALLBACK_AUTH_TYPE: string = 'bearer';
 
 async function getApiConfig(): Promise<{ apiKey: string; baseUrl: string; model: string; authHeaders: Record<string, string> }> {
   const dbKey = await getActiveApiKey();
