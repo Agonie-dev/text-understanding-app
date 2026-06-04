@@ -1,5 +1,17 @@
-const KIMI_API_KEY = process.env.KIMI_API_KEY!;
-const KIMI_BASE_URL = process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
+import { getActiveApiKey } from './admin';
+
+// Fallback: 环境变量中的默认 Kimi Key
+const FALLBACK_API_KEY = process.env.KIMI_API_KEY!;
+const FALLBACK_BASE_URL = process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
+
+async function getApiConfig(): Promise<{ apiKey: string; baseUrl: string }> {
+  const dbKey = await getActiveApiKey();
+  if (dbKey) {
+    return { apiKey: dbKey.apiKey, baseUrl: dbKey.baseUrl };
+  }
+  // 数据库没有配置时 fallback 到环境变量
+  return { apiKey: FALLBACK_API_KEY, baseUrl: FALLBACK_BASE_URL };
+}
 
 export type SummaryStyle = 'default' | 'academic' | 'meeting' | 'news' | 'minimal';
 
@@ -149,11 +161,12 @@ function buildPrompts(text: string, style: SummaryStyle = 'default', isPartial =
 }
 
 export async function callKimiChat(messages: { role: string; content: string }[]) {
-  const res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
+  const { apiKey, baseUrl } = await getApiConfig();
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${KIMI_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: 'moonshot-v1-128k',
@@ -207,11 +220,12 @@ export async function summarizeText(text: string, style: SummaryStyle = 'default
 // ===== Streaming Support =====
 
 export async function* callKimiChatStream(messages: { role: string; content: string }[]) {
-  const res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
+  const { apiKey, baseUrl } = await getApiConfig();
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${KIMI_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: 'moonshot-v1-128k',
@@ -319,15 +333,16 @@ export async function* summarizeTextStream(text: string, style: SummaryStyle = '
 // ===== File Upload & OCR =====
 
 export async function uploadFileToKimi(buffer: Buffer, filename: string): Promise<string> {
+  const { apiKey, baseUrl } = await getApiConfig();
   const blob = new Blob([new Uint8Array(buffer)]);
   const formData = new FormData();
   formData.append('file', blob, filename);
   formData.append('purpose', 'file-extract');
 
-  const res = await fetch(`${KIMI_BASE_URL}/files`, {
+  const res = await fetch(`${baseUrl}/files`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${KIMI_API_KEY}`,
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: formData,
   });
@@ -342,7 +357,7 @@ export async function uploadFileToKimi(buffer: Buffer, filename: string): Promis
 }
 
 export async function extractTextWithKimiOCR(fileId: string): Promise<string> {
-  const res = await callKimiChat([
+  return callKimiChat([
     {
       role: 'system',
       content: '你是一个专业的 OCR 文本提取助手。请提取这份文档中的全部文本内容，保留段落结构。如果是扫描件，请尽可能识别图片中的文字。直接输出原文，不要添加额外说明。',
@@ -352,5 +367,4 @@ export async function extractTextWithKimiOCR(fileId: string): Promise<string> {
       content: `请提取文件 ${fileId} 中的全部文本内容。`,
     },
   ]);
-  return res;
 }
