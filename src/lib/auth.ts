@@ -8,7 +8,7 @@ const JWT_SECRET = new TextEncoder().encode(
 );
 
 // 数据库读不到时的 fallback hash（密码为 "admin"）
-const FALLBACK_ADMIN_HASH = '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqhmM6JGKpS4G3R1G2JH8YpfB0Bqy';
+const FALLBACK_ADMIN_HASH = '$2b$10$H28nSABa66UvuGkwju0lpOAYLYoDTbCpT2GjoI0O511oDk004sVy.';
 
 export interface AdminPayload {
   role: 'admin';
