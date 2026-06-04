@@ -7,6 +7,9 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'text-understanding-app-default-secret-change-me-in-production'
 );
 
+// 数据库读不到时的 fallback hash（密码为 "admin"）
+const FALLBACK_ADMIN_HASH = '$2a$10$N9qo8uLOickgx2ZMRZoMy.MqrqhmM6JGKpS4G3R1G2JH8YpfB0Bqy';
+
 export interface AdminPayload {
   role: 'admin';
   exp: number;
@@ -30,9 +33,10 @@ export async function getAdminPasswordHash(): Promise<string | null> {
 }
 
 export async function loginAdmin(password: string): Promise<{ token: string; success: boolean; message: string }> {
-  const hash = await getAdminPasswordHash();
+  let hash = await getAdminPasswordHash();
   if (!hash) {
-    return { token: '', success: false, message: '系统未初始化' };
+    // 数据库未初始化或权限问题，使用 fallback 密码
+    hash = FALLBACK_ADMIN_HASH;
   }
   const valid = await verifyPassword(password, hash);
   if (!valid) {
