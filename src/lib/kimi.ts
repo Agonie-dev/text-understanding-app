@@ -11,13 +11,13 @@ async function getApiConfig(): Promise<{ apiKey: string; baseUrl: string; model:
   if (dbKey) {
     const model = dbKey.model || (dbKey.baseUrl.includes('moonshot') ? 'moonshot-v1-128k' : 'gpt-4');
     const authType = dbKey.authType || 'bearer';
-    const authHeaders = authType === 'api-key' 
+    const authHeaders: Record<string, string> = authType === 'api-key' 
       ? { 'api-key': dbKey.apiKey }
       : { 'Authorization': `Bearer ${dbKey.apiKey}` };
     return { apiKey: dbKey.apiKey, baseUrl: dbKey.baseUrl, model, authHeaders };
   }
   // 数据库没有配置时 fallback 到环境变量
-  const authHeaders = FALLBACK_AUTH_TYPE === 'api-key'
+  const authHeaders: Record<string, string> = FALLBACK_AUTH_TYPE === 'api-key'
     ? { 'api-key': FALLBACK_API_KEY }
     : { 'Authorization': `Bearer ${FALLBACK_API_KEY}` };
   return { apiKey: FALLBACK_API_KEY, baseUrl: FALLBACK_BASE_URL, model: FALLBACK_MODEL, authHeaders };
