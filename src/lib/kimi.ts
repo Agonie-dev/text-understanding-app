@@ -4,13 +4,50 @@ import { getActiveApiKey } from './admin';
 const FALLBACK_API_KEY = process.env.KIMI_API_KEY!;
 const FALLBACK_BASE_URL = process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1';
 
-async function getApiConfig(): Promise<{ apiKey: string; baseUrl: string }> {
+// 根据 baseUrl 推断模型和请求格式
+function inferApiFormat(baseUrl: string) {
+  const url = baseUrl.toLowerCase();
+  
+  if (url.includes('moonshot')) {
+    return {
+      model: 'moonshot-v1-128k',
+      authHeader: (key: string) => ({ 'Authorization': `Bearer ${key}` }),
+    };
+  }
+  
+  if (url.includes('mimo') || url.includes('xiaomi')) {
+    return {
+      model: 'mimo-v2.5-pro',
+      authHeader: (key: string) => ({ 'api-key': key }),
+    };
+  }
+  
+  // 默认 OpenAI 兼容格式
+  return {
+    model: 'gpt-4',
+    authHeader: (key: string) => ({ 'Authorization': `Bearer ${key}` }),
+  };
+}
+
+async function getApiConfig(): Promise<{ apiKey: string; baseUrl: string; model: string; authHeaders: Record<string, string> }> {
   const dbKey = await getActiveApiKey();
   if (dbKey) {
-    return { apiKey: dbKey.apiKey, baseUrl: dbKey.baseUrl };
+    const format = inferApiFormat(dbKey.baseUrl);
+    return {
+      apiKey: dbKey.apiKey,
+      baseUrl: dbKey.baseUrl,
+      model: format.model,
+      authHeaders: format.authHeader(dbKey.apiKey),
+    };
   }
   // 数据库没有配置时 fallback 到环境变量
-  return { apiKey: FALLBACK_API_KEY, baseUrl: FALLBACK_BASE_URL };
+  const format = inferApiFormat(FALLBACK_BASE_URL);
+  return {
+    apiKey: FALLBACK_API_KEY,
+    baseUrl: FALLBACK_BASE_URL,
+    model: format.model,
+    authHeaders: format.authHeader(FALLBACK_API_KEY),
+  };
 }
 
 export type SummaryStyle = 'default' | 'academic' | 'meeting' | 'news' | 'minimal';
@@ -161,15 +198,15 @@ function buildPrompts(text: string, style: SummaryStyle = 'default', isPartial =
 }
 
 export async function callKimiChat(messages: { role: string; content: string }[]) {
-  const { apiKey, baseUrl } = await getApiConfig();
+  const { baseUrl, model, authHeaders } = await getApiConfig();
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      ...authHeaders,
     },
     body: JSON.stringify({
-      model: 'moonshot-v1-128k',
+      model,
       messages,
       temperature: 0.1,
     }),
@@ -177,7 +214,7 @@ export async function callKimiChat(messages: { role: string; content: string }[]
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Kimi API error: ${res.status} ${err}`);
+    throw new Error(`API error: ${res.status} ${err}`);
   }
 
   const data = await res.json();
@@ -220,15 +257,15 @@ export async function summarizeText(text: string, style: SummaryStyle = 'default
 // ===== Streaming Support =====
 
 export async function* callKimiChatStream(messages: { role: string; content: string }[]) {
-  const { apiKey, baseUrl } = await getApiConfig();
+  const { baseUrl, model, authHeaders } = await getApiConfig();
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      ...authHeaders,
     },
     body: JSON.stringify({
-      model: 'moonshot-v1-128k',
+      model,
       messages,
       temperature: 0.1,
       stream: true,
@@ -237,7 +274,7 @@ export async function* callKimiChatStream(messages: { role: string; content: str
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Kimi API error: ${res.status} ${err}`);
+    throw new Error(`API error: ${res.status} ${err}`);
   }
 
   const reader = res.body!.getReader();
@@ -349,7 +386,7 @@ export async function uploadFileToKimi(buffer: Buffer, filename: string): Promis
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Kimi file upload error: ${res.status} ${err}`);
+    throw new Error(`File upload error: ${res.status} ${err}`);
   }
 
   const data = await res.json();
