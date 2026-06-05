@@ -56,7 +56,7 @@ export async function getActiveApiKey(): Promise<ApiKeyConfig | null> {
 export async function getAllApiKeys(): Promise<Omit<ApiKeyConfig, 'apiKey'>[]> {
   const { data } = await supabase
     .from('api_keys')
-    .select('id, name, base_url, model, is_active, is_default, created_at')
+    .select('id, name, base_url, model, auth_type, is_active, is_default, created_at')
     .order('created_at', { ascending: false });
 
   return (data || []).map((row) => ({
