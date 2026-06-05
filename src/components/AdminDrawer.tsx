@@ -2,11 +2,12 @@
 
 import { useState, useCallback, useEffect } from 'react';
 
-interface ApiKeyItem {
+export interface ApiKeyItem {
   id: string;
   name: string;
   baseUrl: string;
   model?: string;
+  authType?: string;
   isActive: boolean;
   isDefault: boolean;
 }
@@ -247,6 +248,7 @@ export default function AdminDrawer({ isOpen, onClose, onLogout }: AdminDrawerPr
                     <div className="font-medium text-gray-800 truncate">{k.name}</div>
                     <div className="text-xs text-gray-400 truncate">{k.baseUrl}</div>
                     {k.model && <div className="text-xs text-blue-400 truncate">模型: {k.model}</div>}
+                    {k.authType && <div className="text-xs text-orange-400 truncate">认证: {k.authType}</div>}
                   </div>
                   <span className={`text-xs px-1.5 py-0.5 rounded ${k.isDefault ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
                     {k.isDefault ? '默认' : ''}

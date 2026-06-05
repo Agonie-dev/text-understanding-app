@@ -65,6 +65,7 @@ export async function getAllApiKeys(): Promise<Omit<ApiKeyConfig, 'apiKey'>[]> {
     apiKey: '', // 列表不返回明文
     baseUrl: row.base_url,
     model: row.model,
+    authType: row.auth_type,
     isActive: row.is_active,
     isDefault: row.is_default,
   }));

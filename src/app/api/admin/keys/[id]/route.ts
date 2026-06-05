@@ -23,12 +23,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   try {
     const { id } = await params;
-    const { name, api_key, base_url, is_active, is_default } = await req.json();
+    const { name, api_key, base_url, model, auth_type, is_active, is_default } = await req.json();
 
     const updates: Record<string, any> = {};
     if (name) updates.name = name;
     if (api_key) updates.api_key = encrypt(api_key);
     if (base_url) updates.base_url = base_url;
+    if (model !== undefined) updates.model = model || null;
+    if (auth_type) updates.auth_type = auth_type;
     if (typeof is_active === 'boolean') updates.is_active = is_active;
     if (typeof is_default === 'boolean') updates.is_default = is_default;
 
