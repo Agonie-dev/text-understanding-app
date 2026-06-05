@@ -343,7 +343,7 @@ export async function* summarizeTextStream(text: string, style: SummaryStyle = '
 // ===== File Upload & OCR =====
 
 export async function uploadFileToKimi(buffer: Buffer, filename: string): Promise<string> {
-  const { apiKey, baseUrl } = await getApiConfig();
+  const { apiKey, baseUrl, authHeaders } = await getApiConfig();
   const blob = new Blob([new Uint8Array(buffer)]);
   const formData = new FormData();
   formData.append('file', blob, filename);
@@ -351,9 +351,7 @@ export async function uploadFileToKimi(buffer: Buffer, filename: string): Promis
 
   const res = await fetch(`${baseUrl}/files`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-    },
+    headers: authHeaders,
     body: formData,
   });
 
