@@ -19,7 +19,6 @@ export async function getActiveApiKey(): Promise<ApiKeyConfig | null> {
     .eq('is_active', true)
     .eq('is_default', true)
     .single();
-  console.log('[DIAG] getActiveApiKey primary query:', { data, isActive: data?.is_active, isDefault: data?.is_default, name: data?.name });
 
   if (!data) {
     // 回退：取任意一个 active 的
