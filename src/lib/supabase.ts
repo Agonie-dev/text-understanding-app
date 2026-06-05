@@ -4,10 +4,12 @@ let _client: SupabaseClient | null = null;
 
 function createSupabaseClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  // Server-side uses service_role key (bypasses RLS), client-side uses anon key
-  const key = typeof window === 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY
+  const isServer = typeof window === 'undefined';
+  const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = isServer && hasServiceKey
     ? process.env.SUPABASE_SERVICE_ROLE_KEY!
     : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  console.log(`[DIAG] createSupabaseClient: isServer=${isServer}, hasServiceKey=${hasServiceKey}, keyPrefix=${key.slice(0, 20)}...`);
   return createClient(url, key);
 }
 

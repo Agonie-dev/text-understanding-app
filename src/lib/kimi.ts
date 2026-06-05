@@ -8,18 +8,21 @@ const FALLBACK_AUTH_TYPE: string = 'bearer';
 
 async function getApiConfig(): Promise<{ apiKey: string; baseUrl: string; model: string; authHeaders: Record<string, string> }> {
   const dbKey = await getActiveApiKey();
+  console.log('[DIAG] getActiveApiKey result:', dbKey ? { name: dbKey.name, baseUrl: dbKey.baseUrl, model: dbKey.model, authType: dbKey.authType } : null);
   if (dbKey) {
     const model = dbKey.model || (dbKey.baseUrl.includes('moonshot') ? 'moonshot-v1-128k' : 'gpt-4');
     const authType = dbKey.authType || 'bearer';
     const authHeaders: Record<string, string> = authType === 'api-key' 
       ? { 'api-key': dbKey.apiKey }
       : { 'Authorization': `Bearer ${dbKey.apiKey}` };
+    console.log('[DIAG] using dbKey:', { baseUrl: dbKey.baseUrl, model, authType });
     return { apiKey: dbKey.apiKey, baseUrl: dbKey.baseUrl, model, authHeaders };
   }
   // 数据库没有配置时 fallback 到环境变量
   const authHeaders: Record<string, string> = FALLBACK_AUTH_TYPE === 'api-key'
     ? { 'api-key': FALLBACK_API_KEY }
     : { 'Authorization': `Bearer ${FALLBACK_API_KEY}` };
+  console.log('[DIAG] fallback to env:', { baseUrl: FALLBACK_BASE_URL, model: FALLBACK_MODEL, authType: FALLBACK_AUTH_TYPE });
   return { apiKey: FALLBACK_API_KEY, baseUrl: FALLBACK_BASE_URL, model: FALLBACK_MODEL, authHeaders };
 }
 
