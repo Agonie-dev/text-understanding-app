@@ -4,7 +4,10 @@ let _client: SupabaseClient | null = null;
 
 function createSupabaseClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Server-side uses service_role key (bypasses RLS), client-side uses anon key
+  const key = typeof window === 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? process.env.SUPABASE_SERVICE_ROLE_KEY!
+    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createClient(url, key);
 }
 
